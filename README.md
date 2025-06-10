@@ -7,14 +7,15 @@ Developed in Python
 Web-based application that enables users to analyze and visualize business investment portfolios using stochastic simulation data in the SIPmath 2.0 format. Supports both .csv and .xlsx (Excel) files.
 
 Key Features:
-1. Automatically generates a diverse set of random portfolio combinations using Dirichlet-distributed weights to ensure that the weights sum to 1
-2. Support inclusion/exclusion of assets using binary masks for discrete subset sampling
-3. Filtering of investment-based constraints (expected revenue, margins, etc.)
-4. Portfolio-specific calculations (mean operating margin, percentile operating margin, etc.)
-5. Visualizations on a 2D scatterplot
-6. User-friendly UI system, detailed below
-7. Support Investment Teathering with different customizable dependency rules
-8. Winds of Fortune integration to simulate real-world probable scenarios
+1. Imports SIPMath 2.0 format SIP files for portfolio investments and Winds of Fortune
+2. Automatically generates a diverse set of random portfolio combinations using Dirichlet-distributed weights to ensure that the weights sum to 1
+3. Support inclusion/exclusion of assets using binary masks for discrete subset sampling
+4. Filtering of investment-based constraints (expected revenue, margins, etc.)
+5. Portfolio-specific calculations (mean operating margin, percentile operating margin, etc.)
+6. Visualizations on a 2D scatterplot
+7. User-friendly UI system, detailed below
+8. Support Investment Teathering with different customizable dependency rules
+9. Winds of Fortune integration to simulate real-world probable scenarios
 
 # User Interface (UI)
 Portfolio Analysis Screen
