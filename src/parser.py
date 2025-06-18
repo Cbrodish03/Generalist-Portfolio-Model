@@ -1,4 +1,6 @@
 import os
+import pandas as pd
+import math
 
 """
 A parser built for the Generalist-Portfolio-Model
@@ -14,17 +16,57 @@ class SIPParser:
         Checks the file extension of the given file
         """
         filename, ext = os.path.splitext(self.filepath)
-        if ext.lower() != '.xlsx':
-            raise ValueError(f"Invalid file type: {self.filepath}. Expected .xlsx (Excel) type")
-        
         if ext.lower() == '.xlsx':
             self.parse_xlsx()
+        else:
+            raise ValueError(f"Invalid file type: {self.filepath}. Expected .xlsx (Excel) type")
         
     def parse_xlsx(self):
-        # TODO: to be implemented
-        return
+        """
+        Parses the given Excel file and extracts relevant data
+        """
+        df = pd.read_excel(self.filepath, header=None)
+        print(f"Data from {self.filepath}:\n")
+        # print(excel_data.head(15))  # Display the first few rows of the data
 
+        # Step 1: Identify where the actual trial data starts by skipping the first two empty rows
+        # TODO: add logic to preserve the header row (if important)
         
+        empty_row_count = 0
+        start_row = 0
+
+        for i, row in df.iterrows():
+            if all(pd.isna(cell) or (isinstance(cell, float) and math.isnan(cell)) for cell in row[1:]):
+                empty_row_count += 1
+                if empty_row_count == 2:
+                    start_row = i + 1  # trial data starts after the second empty row
+                    break
+
+        # Step 2: Truncate data to start from the identified row
+        trial_df = df.iloc[start_row:]
+
+        # Step 3: Collect trial info and metadata from the columns
+        group_data = []
+        metadata_fields = ['Name', 'ExpectedRevenue', 'BusinessUnit', 'ProductType']
+        num_rows = trial_df.shape[0]
+        trial_end_row = num_rows - 4
+
+        for col in trial_df.columns[2:]:
+            column_data = trial_df[col].tolist()
+            trials = column_data[:trial_end_row]
+            metadata_values = column_data[trial_end_row:]
+
+            group_entry = {
+                "group_index": col - 2,
+                "metadata": dict(zip(metadata_fields, metadata_values)),
+                "trials": trials
+            }
+
+            group_data.append(group_entry)
+
+        print(group_data)  
+
+
 def test_validation():
     # create test case pairs of {filepath, bool}
     # where filepath is the name of the file, bool is whether it should be expected or not
@@ -48,7 +90,14 @@ def test_validation():
             if expected:
                 print(f"{filepath}: expected pass but failed")
 
+def test_parser():
+    # create test case to test the parser functionality
+    test_parser = SIPParser("data/small_SIP.xlsx")
+
+
+
 # main method to test current state of parser
 if __name__ == "__main__":
-    test_validation()
+    # test_validation()
+    test_parser()
 
