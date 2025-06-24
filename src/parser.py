@@ -9,6 +9,7 @@ Currently supports files of type: .xlsx
 class SIPParser:
     def __init__(self, filepath):
         self.filepath = filepath
+        self.group_data = []
         self.validate_file_type()
         
     def validate_file_type(self):
@@ -62,9 +63,9 @@ class SIPParser:
                 "trials": trials
             }
 
-            group_data.append(group_entry)
+            self.group_data.append(group_entry)
 
-        print(group_data)  
+        print(self.group_data)  
 
 
 def test_validation():
