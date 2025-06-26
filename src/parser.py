@@ -9,15 +9,15 @@ Currently supports files of type: .xlsx
 class SIPParser:
     def __init__(self, filepath):
         self.filepath = filepath
-        self.validate_file_type()
-        
+        self.investments = self.validate_file_type()
+
     def validate_file_type(self):
         """
         Checks the file extension of the given file
         """
         filename, ext = os.path.splitext(self.filepath)
         if ext.lower() == '.xlsx':
-            self.parse_xlsx()
+            return self.parse_xlsx()
         else:
             raise ValueError(f"Invalid file type: {self.filepath}. Expected .xlsx (Excel) type")
         
@@ -26,21 +26,20 @@ class SIPParser:
         Parses the given Excel file and extracts relevant data
         """
         df = pd.read_excel(self.filepath, header=None)
-        print(f"Data from {self.filepath}:\n")
+        # print(f"Data from {self.filepath}:\n")
         # print(excel_data.head(15))  # Display the first few rows of the data
 
         # Step 1: Identify where the actual trial data starts by skipping the first two empty rows
         # TODO: add logic to preserve the header row (if important)
-        
-        empty_row_count = 0
-        start_row = 0
+        start_row = None
 
         for i, row in df.iterrows():
-            if all(pd.isna(cell) or (isinstance(cell, float) and math.isnan(cell)) for cell in row[1:]):
-                empty_row_count += 1
-                if empty_row_count == 2:
-                    start_row = i + 1  # trial data starts after the second empty row
-                    break
+            if row[1] == 1:
+                start_row = i
+                break
+
+        if start_row is None:
+            raise ValueError("Could not find trial start indicator.")
 
         # Step 2: Truncate data to start from the identified row
         trial_df = df.iloc[start_row:]
@@ -64,7 +63,8 @@ class SIPParser:
 
             group_data.append(group_entry)
 
-        print(group_data)  
+        # print(group_data)
+        return group_data
 
 
 def test_validation():
