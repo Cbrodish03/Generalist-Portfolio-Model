@@ -1,7 +1,10 @@
 import numpy as np
 from parser import SIPParser
 
-
+"""
+Dirichlet-random portfolio generator built for Generalist-Portfolio-Model
+Works with SIP Standard 2.0-compliant files
+"""
 class RandomPortfolios:
    def __init__(self):
       self.sample_ports = []

@@ -17,6 +17,8 @@ def plot_dirichlet(random_ports):
    
    plt.scatter(xs, ys)
 
+
+# TODO: move these calcs BACK over to eff_frontier.py so this module isn't too bogged down with math and can add more graphing functionalities (binary toggle, efficient portfolios, etc.)
 def create_matrices(group_data):
    """
    Compiles individual asset mean & variance data into matrices for efficient-frontier calculations
@@ -66,6 +68,7 @@ def compute_coeffs(group_data):
 
    denom = x * y - (z ** 2)
 
+   # Computes numerical coefficients in efficient-frontier equation
    a = (np.matmul(np.matmul(unit_vector.transpose(), sig_inverse), unit_vector)) / denom
    b = 2 * (np.matmul(np.matmul(unit_vector.transpose(), sig_inverse), mu_hat)) / denom
    c = (np.matmul(np.matmul(mu_hat.transpose(), sig_inverse), mu_hat)) / denom
