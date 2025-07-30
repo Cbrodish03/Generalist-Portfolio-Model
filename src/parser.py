@@ -61,7 +61,7 @@ class SIPParser:
                 "trials": trials
             }
 
-            self.group_data.append(group_entry)
+            group_data.append(group_entry)
 
         # print(group_data)
         return group_data
