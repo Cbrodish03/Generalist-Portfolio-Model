@@ -9,22 +9,21 @@ class RandomPortfolios:
    def __init__(self):
       self.sample_ports = []
 
-   def random_port(assets, port_index):
+   def random_port(self, assets, port_index):
       """
       Creates a single random portfolio of SIP assets using Dirichlet-distributed random weights
       """
-      count = assets[-1]['group_index']
+      count = len(assets)
       num_trials = len(assets[0]['trials'])
-      expected_rev = 0
+      expected_rev = 0.0
 
       # Generates Dirichlet-random weights for portfolios given array of concentration parameters 'alphas'
       # NOTE on 'alphas': higher alpha values => more "uniformly random" weights
-      alphas = np.random.rand(count)
-      alphas += np.random.randint(100, size=count)
+      alphas = np.random.rand(count) + np.random.randint(100, size=count)
       weights = np.random.dirichlet(alphas)
 
       # Creates empty array for new weighted combination of trials
-      new_trials = np.empty(num_trials)
+      new_trials = np.zeros(num_trials)
    
       # Recalculates expected revenue & trial data for random portfolio as a weighted combination of asset data
       for i in range(count):
@@ -54,26 +53,25 @@ class RandomPortfolios:
 
       return random_port
 
-   def generate_sample(source):
+   def generate_sample(self, source, count=10):
       """
       Returns a set of [count] Dirichlet random portfolios
       """
-      sample_ports = []
+      self.sample_ports = [
+         self.random_port(source, i) for i in range(count)
+      ]
       
-      count = int(input("How many Dirichlet-random portfolios would you like to generate?\n"))
-
-      # TODO: implement parameters for generation (min average return, etc)
-      for i in range(count):
-         sample_ports.append(RandomPortfolios.random_port(source, i))
+      return self.sample_ports
       
-      return sample_ports
 
 if __name__ == "__main__":
    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
    # SLURP = SIPParser("data/small_SIP.xlsx")
    group_data = SLURP.investments
 
-   sample_portfolios = RandomPortfolios.generate_sample(group_data)
+   gen = RandomPortfolios()
+   sample_portfolios = gen.generate_sample(group_data, count=100)
+
    for port in sample_portfolios:
       print(port['avg_return'], port['variance'], port['asset_weights'], sep=', ')
 

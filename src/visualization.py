@@ -90,9 +90,12 @@ if __name__ == "__main__":
    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
    # SLURP = SIPParser("data/small_SIP.xlsx")
    group_data = SLURP.investments
-   sample_portfolios = RandomPortfolios.generate_sample(group_data)
+   
+   gen = RandomPortfolios()
+   count = int(input("How many "))
+   sample_ports = gen.generate_sample(group_data)
 
-   plot_dirichlet(sample_portfolios)
+   plot_dirichlet(sample_ports)
    plot_frontier(group_data)
    plt.show()
 
