@@ -9,11 +9,11 @@ def plot_dirichlet(random_ports):
    """
    xs = []
    ys = []
-   count = random_ports[-1]['port_index'] + 1
+   count = len(random_ports)
 
    for i in range(count):
-      xs.append(np.sqrt(random_ports[i]['variance']))
-      ys.append(random_ports[i]['avg_return'])
+      xs.append(np.sqrt(random_ports[i]['metadata']['Variance']))
+      ys.append(random_ports[i]['metadata']['AverageReturn'])
    
    plt.scatter(xs, ys)
 
@@ -92,11 +92,11 @@ if __name__ == "__main__":
    group_data = SLURP.investments
    
    gen = RandomPortfolios()
-   count = int(input("How many "))
-   sample_ports = gen.generate_sample(group_data)
+   sample_ports = gen.generate_sample(group_data, count=50)
 
-   plot_dirichlet(sample_ports)
    plot_frontier(group_data)
+   plot_dirichlet(sample_ports)
+   
    plt.show()
 
 
