@@ -2,10 +2,10 @@ import tkinter as tk
 import os
 from tkinter import messagebox
 from parser import SIPParser
+import visualization
 
 # Retrieve SIP-compatible files from the data directory
 data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_FOLDER = os.path.join(BASE_DIR, "data")
 
@@ -21,11 +21,11 @@ def get_sip_files():
     return sip_files
 
 
-
 def parse_button_click():
     """
     Parses the selected file from the options in the /data folder
     """
+    global current_investments
     selected = file_listbox.curselection()
     if not selected:
         messagebox.showwarning("No File Selected", "Please select a file from the identified list")
@@ -39,6 +39,7 @@ def parse_button_click():
     try:
         parser = SIPParser(full_path)
         investments = parser.investments
+        current_investments = investments
         summary_text = f"File: {filename}\n\nTotal investments: {len(investments)}\n"
         for inv in investments:
             meta = inv["metadata"]
@@ -53,11 +54,30 @@ def parse_button_click():
         file_info_box.delete(1.0, tk.END)
         file_info_box.insert(tk.END, summary_text)
         file_info_box.config(state=tk.DISABLED)
-
-
         messagebox.showinfo("Parse Successful", "Successfully parsed requested file.")
     except Exception as e:
         messagebox.showerror("Parse Failed", f"Error {str(e)} occurred while parsing.")
+
+
+def generate_samples():
+    if not current_investments:
+        messagebox.showwarning("No data", "Please parse a file first.")
+        return
+
+    try:
+        count = int(samples_entry.get())
+    except ValueError:
+        messagebox.showerror("Invalid Input", "Please enter a valid integer.")
+        return
+
+    if count < 1 or count > 1000:
+        messagebox.showerror("Invalid Input", "Sample count must be between 1 and 1000.")
+        return
+
+    try:
+        visualization.visualize_portfolios(current_investments, count)
+    except Exception as e:
+        messagebox.showerror("Generation Failed", f"Error: {str(e)}")
 
 
 # Set window settings
@@ -67,6 +87,8 @@ root.configure(background="gray")
 root.minsize(300, 300)
 root.maxsize(1000, 800)
 root.geometry("800x600") # default size
+
+current_investments = None
 
 # Top labels
 tk.Label(root, text="Welcome to the Generalist-Portfolio-Model!", bg="gray", fg="white", font=("Arial", 16)).pack(pady=20)
@@ -99,6 +121,16 @@ parse_button.pack(pady=10)
 sip_files = get_sip_files()
 for file in sip_files:
     file_listbox.insert(tk.END, os.path.basename(file))
+
+# Sample input + generate button
+samples_frame = tk.Frame(root, bg="gray")
+samples_frame.pack(pady=10)
+tk.Label(samples_frame, text="Number of Samples (max 1000):", bg="gray", fg="white", font=("Arial", 12)).pack(side=tk.LEFT, padx=5)
+samples_entry = tk.Entry(samples_frame, width=10)
+samples_entry.pack(side=tk.LEFT, padx=5)
+generate_button = tk.Button(samples_frame, text="Generate Samples", command=generate_samples,
+                            font=("Arial", 12), bg="navy", fg="white")
+generate_button.pack(side=tk.LEFT, padx=5)
 
 # Bottom frame: file info output
 file_info_frame = tk.LabelFrame(root, text="File Info", bg="gray", fg="white", font=("Arial", 12))
