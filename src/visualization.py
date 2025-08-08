@@ -86,18 +86,26 @@ def plot_frontier(group_data):
 
    plt.plot(x, y, 'r')
 
+def visualize_portfolios(group_data, count):
+   """
+   Generates random portfolios and plots them with efficient frontier
+   :param group_data: samples to generate with
+   :param count: number of random portfolios to generate
+   """
+   gen = RandomPortfolios()
+   sample_ports = gen.generate_sample(group_data, count=count)
+
+   # plot generated portfolios and label graph
+   plot_dirichlet(sample_ports)
+   plot_frontier(group_data)
+   plt.xlabel("Risk (Std Dev)")
+   plt.ylabel("Return ($)")
+   plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
+   plt.show()
+
 if __name__ == "__main__":
    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
    # SLURP = SIPParser("data/small_SIP.xlsx")
    group_data = SLURP.investments
-   
-   gen = RandomPortfolios()
-   sample_ports = gen.generate_sample(group_data, count=50)
-
-   plot_frontier(group_data)
-   plot_dirichlet(sample_ports)
-   
-   plt.show()
-
-
-
+   count = int(input("How many Dirichlet-random portfolios would you like to generate?"))
+   visualize_portfolios(group_data, count=count)
