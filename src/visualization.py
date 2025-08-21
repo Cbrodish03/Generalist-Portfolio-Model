@@ -81,7 +81,7 @@ def plot_frontier(group_data):
    """
    a, b, c, ymax = compute_coeffs(group_data)
 
-   y = np.arange(ymax)
+   y = np.arange(b/(2 * a), ymax)
    x = np.sqrt((a * y ** 2) - b * y + c)
 
    plt.plot(x, y, 'r')
@@ -96,10 +96,10 @@ def visualize_portfolios(group_data, count):
    sample_ports = gen.generate_sample(group_data, count=count)
 
    # plot generated portfolios and label graph
-   plot_dirichlet(sample_ports)
    plot_frontier(group_data)
+   plot_dirichlet(sample_ports)
    plt.xlabel("Risk (Std Dev)")
-   plt.ylabel("Return ($)")
+   plt.ylabel("Average Return ($)")
    plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
    plt.show()
 
@@ -107,5 +107,5 @@ if __name__ == "__main__":
    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
    # SLURP = SIPParser("data/small_SIP.xlsx")
    group_data = SLURP.investments
-   count = int(input("How many Dirichlet-random portfolios would you like to generate?"))
+   count = int(input("How many Dirichlet-random portfolios would you like to generate?\n"))
    visualize_portfolios(group_data, count=count)
