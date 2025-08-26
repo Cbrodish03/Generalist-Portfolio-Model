@@ -1,4 +1,5 @@
 import numpy as np
+import variance_calcs as vc
 from parser import SIPParser
 
 class Portfolio:
@@ -93,39 +94,13 @@ class Portfolio:
 
    def eff_weights(self, group_data):
       # TODO: implement framework for user-input desired return mu_p
-      # Step 1: Create empty ndarray to store mean values, NxN matrix for variances
-      mu_hat = np.empty(len(group_data))
-      sig_matrix = np.empty((len(group_data), len(group_data)))
-
-      # Step 2: Initialize mu_hat, sig_matrix with avg return & variance for each SIP
-      for sip in group_data:
-         nptrials = np.array(sip['trials'], dtype='f')
-
-         mu_hat[sip['group_index']] = np.average(nptrials) * sip['metadata']['ExpectedRevenue']
-         sig_matrix[sip['group_index']][sip['group_index']] = np.var(nptrials) * sip['metadata']['ExpectedRevenue']
-
-      # Step 3: Populate covariance values with 0
-      # TODO: Implement covariance calcs for investment tethering functionality
-      for i in range(len(group_data)):
-         for j in range(len(group_data)):
-            if sig_matrix[i][j] == None:
-               sig_matrix[i][j] = 0
-      sig_inverse = np.linalg.inv(sig_matrix)
-   
-      unit_vector = np.empty(len(group_data))
-      unit_vector.fill(1)
-      U = np.vstack((mu_hat, unit_vector))
-
-      # Turns mu_hat, unit_vector into vectors (1 row, n columns) for matrix operations
-      mu_hat = mu_hat.transpose()
-      unit_vector = unit_vector.transpose()
-      U = U.transpose()
+      mu_hat, sig_inverse, unit_vector = vc.create_matrices(group_data)
+      U = np.column_stack((mu_hat, unit_vector))
 
       M = np.matmul(np.matmul(U.transpose(), sig_inverse), U)
       M_inverse = np.linalg.inv(M)
 
-      # THIS IS THE DESIRED RETURN VARIABLE!!
-      mu_p = 250000
+      mu_p = 190000     # THIS IS THE DESIRED RETURN VARIABLE!!
       u = np.array([mu_p, 1])
       u = u.transpose()
 
@@ -138,9 +113,9 @@ if __name__ == "__main__":
    group_data = SLURP.investments
 
    # Test for custom case:
-   gen = Portfolio()
+   """ gen = Portfolio()
    cust = gen.construct_port(group_data)
-   print(cust['metadata']['AverageReturn'], cust['metadata']['Variance'], cust['weights'], sep=', ')
+   print(cust['metadata']['AverageReturn'], cust['metadata']['Variance'], cust['weights'], sep=', ') """
    
    # Test for random case:
    """ sample_portfolios = []
@@ -153,9 +128,9 @@ if __name__ == "__main__":
       print(port['metadata']['AverageReturn'], port['metadata']['Variance'], port['weights'], sep=', ') """
 
    # Test for efficient case:
-   """ gen = Portfolio()
+   gen = Portfolio()
    eff = gen.construct_port(group_data, 'e')
-   print(eff['metadata']['AverageReturn'], eff['metadata']['Variance'], eff['weights'], sep=', ') """
+   print(eff['metadata']['AverageReturn'], np.sqrt(eff['metadata']['Variance']), eff['weights'], sep=', ')
    
 
 
