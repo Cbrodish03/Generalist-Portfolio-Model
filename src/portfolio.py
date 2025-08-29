@@ -9,6 +9,12 @@ class Portfolio:
    # TODO: add function to turn SIPs on/off BEFORE portfolio building/calcs
    # Will probably need to edit input from parser separately
    def construct_port(self, source, type='c'):
+      """
+      Creates an individual Portfolio object using SIP data
+      :param source: SIP trial data used to construct portfolio
+      :param type: can select custom, random, or Markowitz-efficient weights
+      :return self.port: returns singular Portfolio object with desired asset weights
+      """
       if type == 'c':
          self.port['weights'] = self.cust_weights(source)
          port_type = 'cust'
@@ -17,7 +23,8 @@ class Portfolio:
          port_type = 'rand'
       elif type == 'e':
          # TODO: add weights calculation for Pareto-efficient port using 10% OM
-         self.port['weights'] = self.eff_weights(source)
+         mu_p = int(input("Desired average return? "))
+         self.port['weights'] = self.eff_weights(source, mu_p)
          port_type = 'eff'
       else:
          raise ValueError("Invalid portfolio type.")
@@ -42,14 +49,15 @@ class Portfolio:
       # Split the avg_return & variance calculations into two processes since it kept throwing a runtime error :/
       mean = np.mean(new_trials)
       var = np.var(new_trials)
-      percentile = np.percentile(new_trials, 10)
+      percentile = np.percentile(new_trials, 10)      # TODO: make user-defined!
          
       self.port['metadata'] = {
          'PortType': port_type,
          'ExpectedRevenue': expected_rev,
          'AverageReturn': mean * expected_rev,
          'Variance': var * expected_rev,
-         'TenPercentOM': percentile * expected_rev
+         'PercentileOM': percentile * expected_rev,
+         'IsParetoEff': False
       }
 
       self.port['trials'] = new_trials
@@ -57,6 +65,12 @@ class Portfolio:
       return self.port
    
    def cust_weights(self, source):
+      """
+      Allows user to input custom asset weights for portfolio generation
+      :param source: SIP trial data
+      :return weights: an array of size count with user-defined asset weights
+      """
+      
       count = len(source)
       # Default: all assets weighted uniformly
       weights = np.full(count, 1/count)
@@ -75,6 +89,7 @@ class Portfolio:
          for j in range(i + 1, count):
             weights[j] = (1000 - port_points)/(count * 1000)
 
+      # Normalizes custom input weights to ensure 100% of assets are allocated
       if port_points > 0:
          # TODO: add user prompt re: normalizing asset weights
          for i in range(count):
@@ -85,6 +100,12 @@ class Portfolio:
 
    
    def rand_weights(self, source):
+      """
+      Generates Dirichlet-random asset weights for portfolio object
+      :param source: SIP trial data
+      :return weights: array of size count random asset weights
+      """
+      
       # TODO: give users more control over alpha values => control "degree of randomness"
       count = len(source)
       alphas = np.random.rand(count) + np.random.randint(100, size=count)
@@ -92,19 +113,25 @@ class Portfolio:
 
       return weights
 
-   def eff_weights(self, group_data):
+   def eff_weights(self, group_data, mu_p):
+      """
+      Calculates Markowitz efficient asset weights
+      :param source: SIP trial data
+      :param mu_p: desired average return value for portfolio
+      :return weights: array of size count efficient asset weights (minimizes variance for given average return)
+      """
+
       # TODO: implement framework for user-input desired return mu_p
       mu_hat, sig_inverse, unit_vector = vc.create_matrices(group_data)
       U = np.column_stack((mu_hat, unit_vector))
 
+      # Matrix calculations
       M = np.matmul(np.matmul(U.transpose(), sig_inverse), U)
       M_inverse = np.linalg.inv(M)
-
-      mu_p = 190000     # THIS IS THE DESIRED RETURN VARIABLE!!
       u = np.array([mu_p, 1])
       u = u.transpose()
-
       weights = np.matmul(np.matmul(np.matmul(sig_inverse, U), M_inverse), u)
+      
       return weights
 
 if __name__ == "__main__":

@@ -3,6 +3,10 @@ import numpy as np
 def create_matrices(group_data):
    """
    Compiles individual asset mean & variance data into matrices for efficient-frontier calculations
+   :param group_data: SIP trial data
+   :return mu_hat: vector containing average return data for calculations
+   :return sig_inverse: 2D array (inverted) of SIP data variance
+   :return unit_vector: n-dimensional unit vector
    """
    # Step 1: Create empty ndarray to store mean values, NxN matrix for variances
    mu_hat = np.empty(len(group_data))
@@ -36,6 +40,9 @@ def create_matrices(group_data):
 def compute_coeffs(group_data):
    """
    Computes numerical coefficients for efficient-frontier equation, given SIP data on mean & variance
+   :param group_data: SIP trial data
+   :return a, b, c: coefficients in efficient frontier equation
+   :return ymax: maximum average return value
    """
    mu_hat, sig_inverse, unit_vector = create_matrices(group_data)
 
