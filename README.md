@@ -3,6 +3,9 @@ The full specification list can be found at: https://docs.google.com/document/d/
 
 Developed in Python
 
+# Note
+Wondering where the most recent updates are? Try checking branches 'staging' or 'experimental'! That's where all the most recent changes go
+
 # Overview
 Web-based application that enables users to analyze and visualize business investment portfolios using stochastic simulation data in the SIPmath 2.0 format. Supports both .csv and .xlsx (Excel) files.
 
