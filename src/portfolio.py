@@ -8,7 +8,7 @@ class Portfolio:
    
    # TODO: add function to turn SIPs on/off BEFORE portfolio building/calcs
    # Will probably need to edit input from parser separately
-   def construct_port(self, source, type='c'):
+   def construct_port(self, source, type='c', mu_p=None):
       """
       Creates an individual Portfolio object using SIP data
       :param source: SIP trial data used to construct portfolio
@@ -23,7 +23,6 @@ class Portfolio:
          port_type = 'rand'
       elif type == 'e':
          # TODO: add weights calculation for Pareto-efficient port using 10% OM
-         mu_p = int(input("Desired average return? "))
          self.port['weights'] = self.eff_weights(source, mu_p)
          port_type = 'eff'
       else:
