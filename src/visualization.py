@@ -10,10 +10,12 @@ class TooltipManager:
       self.ax = ax
       self.fig = ax.figure
       self.scatters = []
+      self.randpts = []
+      self.effpts = []
       self.annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), arrowprops=dict(arrowstyle="->"))
       self.annot.set_visible(False)
       self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
-      # self.cidpress = self.fig.canvas.mpl_connect("pick_event", self.on_pick)
+      self.fig.canvas.mpl_connect("pick_event", self.on_pick)
    
    def add_scatter(self, *args, **kwargs):
       sc = self.ax.scatter(*args, **kwargs)
@@ -25,7 +27,7 @@ class TooltipManager:
       self.annot.xy = pos
       xval = np.around(pos[0], 2)
       yval = np.around(pos[1], 2)
-      index = sc.format_cursor_data(ind["ind"])
+      index = sc.format_cursor_data(ind["ind"] + 1)
       text = f"{index}\n({xval}, {yval})"
       self.annot.set_text(text)
       self.annot.get_bbox_patch().set_alpha(0.4)
@@ -43,6 +45,25 @@ class TooltipManager:
          if vis:
             self.annot.set_visible(False)
             self.fig.canvas.draw_idle()
+
+   def on_pick(self, event):
+      random = self.scatters[0]
+      efficient = self.scatters[1]
+
+      if event.artist == random:
+         ind = int(event.ind)
+         risk = np.around(np.sqrt(self.randpts[ind]['metadata']['Variance']), 2)
+         avreturn = np.around(self.randpts[ind]['metadata']['AverageReturn'], 2)
+         weights = self.randpts[ind]['weights']
+         print(f"Random Portfolio #{ind + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+      elif event.artist == efficient:
+         ind = int(event.ind)
+         avreturn = np.around(self.effpts[ind]['metadata']['AverageReturn'], 2)
+         risk = np.around(np.sqrt(self.effpts[ind]['metadata']['Variance']), 2)
+         weights = self.effpts[ind]['weights']
+         print(f"Efficient Portfolio #{ind + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+
+   
 
 def plot_rand(random_ports):
    """
@@ -87,7 +108,7 @@ def plot_frontier(group_data):
       ys.append(eff_points[i]['metadata']['AverageReturn'])
 
    # plt.plot(x, y, 'r', ls='--')
-   return xs, ys
+   return xs, ys, eff_points
 
 def visualize_portfolios(group_data, count):
    """
@@ -99,12 +120,14 @@ def visualize_portfolios(group_data, count):
    sample_ports = gen.generate_sample(group_data, count=count)
 
    rx, ry = plot_rand(sample_ports)
-   ex, ey = plot_frontier(group_data)
+   ex, ey, effpts = plot_frontier(group_data)
    
    fig, ax = plt.subplots()
    tm = TooltipManager(ax)
    tm.add_scatter(rx, ry, c='b', s=15, picker=True, pickradius=5)
    tm.add_scatter(ex, ey, c='r', marker='*', picker=True, pickradius=5)
+   tm.randpts = sample_ports
+   tm.effpts = effpts
    ax.plot(ex, ey, c='r', ls='--')
 
    plt.xlabel("Risk (Std Dev)")
