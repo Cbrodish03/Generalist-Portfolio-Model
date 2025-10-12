@@ -6,7 +6,7 @@ from portfolio import Portfolio
 from sample_portfolios import RandomPortfolios
 
 class TooltipManager:
-   def __init__(self, ax):
+   def __init__(self, ax, canvas=None):
       self.ax = ax
       self.fig = ax.figure
       self.scatters = []
@@ -14,10 +14,17 @@ class TooltipManager:
       self.effpts = []
       self.annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), arrowprops=dict(arrowstyle="->"))
       self.annot.set_visible(False)
+      if canvas is None:
+         self.canvas = self.fig.canvas
+      else:
+         self.canvas = canvas
+
       self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
       self.fig.canvas.mpl_connect("pick_event", self.on_pick)
    
    def add_scatter(self, *args, **kwargs):
+      if "picker" not in kwargs:
+         kwargs["picker"] = True
       sc = self.ax.scatter(*args, **kwargs)
       self.scatters.append(sc)
       return sc
@@ -128,13 +135,19 @@ def visualize_portfolios(group_data, count):
    tm.add_scatter(ex, ey, c='r', marker='*', picker=True, pickradius=5)
    tm.randpts = sample_ports
    tm.effpts = effpts
-   ax.plot(ex, ey, c='r', ls='--')
 
-   plt.xlabel("Risk (Std Dev)")
-   plt.ylabel("Average Return ($)")
-   plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
-   plt.grid(ls="--")
-   plt.show()
+   ax.plot(ex, ey, c='r', ls='--')
+   ax.set_xlabel("Risk (Std Dev)")
+   ax.set_ylabel("Average Return ($)")
+   ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
+   ax.grid(ls="--")
+
+   # plt.xlabel("Risk (Std Dev)")
+   # plt.ylabel("Average Return ($)")
+   # plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
+   # plt.grid(ls="--")
+   # plt.show()   # swap to returning the figure for integration with UI
+   return fig, tm, sample_ports, effpts
 
 """ def pareto_plot(group_data, count):
    gen = RandomPortfolios()

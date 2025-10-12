@@ -4,6 +4,7 @@ import customtkinter
 import os
 import visualization
 from parser import SIPParser
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("dark-blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -62,11 +63,15 @@ class App(customtkinter.CTk):
         self.tabview = customtkinter.CTkTabview(self, width=250)
         self.tabview.grid(row=0, column=1, rowspan=2, padx=(20, 0), pady=(20, 10), sticky="nsew")
         self.tabview.add("File Details")
-        self.tabview.add("Tab 2")
-        # self.tabview.add("Tab 3")
         self.tabview.tab("File Details").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
         self.tabview.tab("File Details").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
-        # self.tabview.tab("Tab 2").grid_columnconfigure(0, weight=1)
+
+        self.tabview.add("Tab 2")
+        self.tabview.tab("Tab 2").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
+        self.tabview.tab("Tab 2").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
+
+        self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Tab 2"))    # give dedicated tab for Matplotlib fig.
+        self.graph_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         # scrollable textbox inside File Details tab
         self.file_details_textbox = customtkinter.CTkTextbox(
@@ -160,15 +165,57 @@ class App(customtkinter.CTk):
         self.file_details_textbox.configure(state="disabled")
 
     def run_visualization(self):
-        """Run visualization with the given sample count."""
+        """Run visualization with the given sample count and show it in Tab 2."""
         try:
             count = int(self.sample_entry.get())
-            if 1 <= count <= 1000:
-                visualization.visualize_portfolios(self.current_investments, count)
-            else:
+            if not hasattr(self, "current_investments"):
+                tkinter.messagebox.showerror("Error", "Please parse a file first.")
+                return
+            if not (1 <= count <= 1000):
                 tkinter.messagebox.showerror("Invalid Input", "Please enter a number between 1 and 1000.")
+                return
+
+            # Clear old plot if it exists
+            for widget in self.graph_frame.winfo_children():
+                widget.destroy()
+
+            # Get figure and tooltip manager from visualization module
+            fig, tm, sample_ports, effpts = visualization.visualize_portfolios(self.current_investments, count)
+
+            # Embed figure in the Tkinter tab
+            canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
+            canvas.draw()
+            widget = canvas.get_tk_widget()
+            widget.pack(fill="both", expand=True)
+
+            # IMPORTANT: re-bind the tooltip manager's canvas to the Tk canvas so events route correctly
+            # For TooltipManager implementation above we can set tm.canvas to the FigureCanvasTkAgg object
+            # and re-connect event handlers (we re-bind to ensure the correct canvas is used).
+            try:
+                # disconnect old connections if necessary (not strictly necessary here)
+                tm.canvas = canvas  # use the mpl-capable canvas (FigureCanvasTkAgg)
+                # re-register the event handlers on the Tk canvas
+                tm.canvas.mpl_connect("motion_notify_event", tm.hover)
+                tm.canvas.mpl_connect("pick_event", tm.on_pick)
+            except Exception as e:
+                # fallback: attach handlers to fig.canvas
+                fig.canvas.mpl_connect("motion_notify_event", tm.hover)
+                fig.canvas.mpl_connect("pick_event", tm.on_pick)
+
+            # store references so garbage collection doesn't remove them
+            self._last_fig = fig
+            self._last_canvas = canvas
+            self._last_tooltip_manager = tm
+            self._last_sample_ports = sample_ports
+            self._last_eff_pts = effpts
+
+            # Switch to Tab 2
+            self.tabview.set("Tab 2")
+
         except ValueError:
             tkinter.messagebox.showerror("Invalid Input", "Please enter a valid integer.")
+        except Exception as e:
+            tkinter.messagebox.showerror("Visualization Error", f"An error occurred:\n{e}")
 
     def open_input_dialog_event(self):
         dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")

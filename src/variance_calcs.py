@@ -2,36 +2,62 @@ import numpy as np
 
 def create_matrices(group_data):
    """
-   Compiles individual asset mean & variance data into matrices for efficient-frontier calculations
-   :param group_data: SIP trial data
-   :return mu_hat: vector containing average return data for calculations
-   :return sig_inverse: 2D array (inverted) of SIP data variance
-   :return unit_vector: n-dimensional unit vector
+   Compiles individual asset mean & variance data into matrices for efficient-frontier calculations.
+
+   Assumptions:
+   - `sip['trials']` are in the same *unit* as ExpectedRevenue (i.e. if trials are per-unit returns,
+     and you want mean/variance in dollars, scale mean by ExpectedRevenue and variance by ExpectedRevenue**2).
+   - We create a diagonal covariance matrix (off-diagonals zero) for now.
    """
-   # Step 1: Create empty ndarray to store mean values, NxN matrix for variances
-   mu_hat = np.empty(len(group_data))
-   sig_matrix = np.empty((len(group_data), len(group_data)))
+   n = len(group_data)
+   if n == 0:
+      raise ValueError("group_data must contain at least one SIP")
 
-   # Step 2: Initialize mu_hat, sig_matrix with avg return & variance for each SIP
+   # start with zeros (avoid np.empty garbage)
+   mu_hat = np.zeros(n, dtype=float)
+   sig_matrix = np.zeros((n, n), dtype=float)
+
+   # populate diagonal entries
    for sip in group_data:
-      nptrials = np.array(sip['trials'], dtype='f')
+      idx = sip['group_index']
+      nptrials = np.array(sip['trials'], dtype=float)
 
-      mu_hat[sip['group_index']] = np.average(nptrials) * sip['metadata']['ExpectedRevenue']
-      sig_matrix[sip['group_index']][sip['group_index']] = np.var(nptrials) * sip['metadata']['ExpectedRevenue']
+      # expected revenue (scale)
+      rev = sip['metadata'].get('ExpectedRevenue', 1.0)
+      if rev is None:
+         rev = 1.0
 
-   # Step 3: Populate covariance values with 0
-   # TODO: Implement covariance calcs for investment tethering functionality
-   for i in range(len(group_data)):
-      for j in range(len(group_data)):
-         if sig_matrix[i][j] == None:
-            sig_matrix[i][j] = 0
-   
-   unit_vector = np.empty(len(group_data))
-   unit_vector.fill(1)
+      # mean scaled linearly by revenue (same as your original intent)
+      mu_hat[idx] = np.mean(nptrials) * rev
 
-   # Turns mu_hat, unit_vector into vectors (1 row, n columns) for matrix operations
-   mu_hat = mu_hat.transpose()
-   unit_vector = unit_vector.transpose()
+      # variance must be scaled by the square of the linear scale factor
+      sig_matrix[idx, idx] = np.var(nptrials) * (rev ** 2)
+
+   # If you later compute covariances, fill off-diagonals here.
+   # For now they remain zero (i.e., assets treated as uncorrelated).
+
+   # Small relative regularization (so we don't destroy the frontier)
+   # Use a tiny fraction of the average diagonal element.
+   diag_mean = np.mean(np.diag(sig_matrix))
+   if diag_mean == 0:
+      # fallback absolute tiny epsilon if all variances are zero
+      eps = 1e-12
+   else:
+      eps = diag_mean * 1e-10  # extremely small relative regularization
+
+   sig_matrix += np.eye(n) * eps
+
+   unit_vector = np.ones(n, dtype=float)
+
+   # Invert - keep numeric checks for safety
+   det = np.linalg.det(sig_matrix)
+   if abs(det) < 1e-20:
+      # last-resort fallback regularization (still tiny)
+      sig_matrix += np.eye(n) * (1e-8)
+      # recompute det after extra reg
+      det = np.linalg.det(sig_matrix)
+      if abs(det) < 1e-20:
+         raise np.linalg.LinAlgError("Covariance matrix is singular even after tiny regularization.")
 
    sig_inverse = np.linalg.inv(sig_matrix)
 
@@ -50,9 +76,20 @@ def compute_coeffs(group_data):
    ymax = np.max(mu_hat.transpose())
 
    # Computes individual terms in denominator expression
+
+   # print statements for debug
+   # print("mu_hat.transpose = ", mu_hat.transpose())
+   # print("sig_inverse = ", sig_inverse)
+   # print("mu_hat = ", mu_hat)
+
    x = np.matmul(np.matmul(mu_hat.transpose(), sig_inverse), mu_hat)
    y = np.matmul(np.matmul(unit_vector.transpose(), sig_inverse), unit_vector)
    z = np.matmul(np.matmul(unit_vector.transpose(), sig_inverse), mu_hat)
+
+   # print statements for debug
+   # print("x = ", x)
+   # print("y = ", y)
+   # print("z = ", z)
 
    denom = x * y - (z ** 2)
 
