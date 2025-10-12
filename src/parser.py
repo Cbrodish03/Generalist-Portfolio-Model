@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-import math
+import time
 
 """
 A parser built for the Generalist-Portfolio-Model
@@ -20,84 +20,123 @@ class SIPParser:
             return self.parse_xlsx()
         else:
             raise ValueError(f"Invalid file type: {self.filepath}. Expected .xlsx (Excel) type")
-        
+
     def parse_xlsx(self):
         """
         Parses the given Excel file and extracts relevant data
         """
-        df = pd.read_excel(self.filepath, header=None)
-        # print(f"Data from {self.filepath}:\n")
-        # print(excel_data.head(15))  # Display the first few rows of the data
+        # start = time.time()
+        # df = pd.read_excel(self.filepath, engine='openpyxl')    # takes roughly 3.7 seconds
+        # print(f"Reading with openpyxl took {time.time() - start: .2f} seconds")
 
-        # Step 1: Identify where the actual trial data starts by skipping the first two empty rows
-        # TODO: add logic to preserve the header row (if important)
-        start_row = None
+        # start = time.time()
+        df = pd.read_excel(self.filepath, engine='calamine')    # new engine takes about 0.4 seconds
+        # print(f"Reading with calamine took {time.time() - start: .2f} seconds")
 
-        for i, row in df.iterrows():
-            if row[1] == 1:
-                start_row = i
+        print(f"Data from {self.filepath}:\n")
+        print(df.head(15))  # Display the first few rows of the data
+
+        # Step 1: Find "Meta Data"
+        meta_row, meta_col = None, None
+        for r in range(df.shape[0]):
+            for c in range(df.shape[1]):
+                val = df.iat[r, c]
+                if isinstance(val, str) and val.strip().lower() == "meta data":
+                    meta_row, meta_col = r, c
+                    # print(f"'Meta Data' found at row {r}, column {c}")
+                    break
+            if meta_col is not None:
                 break
 
-        if start_row is None:
-            raise ValueError("Could not find trial start indicator.")
+        if meta_col is None:
+            print("No 'Meta Data' marker found in the file.")
+            return []
 
-        # Step 2: Truncate data to start from the identified row
-        trial_df = df.iloc[start_row:]
+        # Step 2: Collect metadata fields below the marker until an empty cell
+        metadata_fields = []
+        metadata_end = None
+        for r in range(meta_row + 1, df.shape[0]):
+            val = df.iat[r, meta_col]
+            if pd.isna(val) or str(val).strip() == "":
+                metadata_end = r
+                break
+            metadata_fields.append(str(val).strip())
 
-        # Step 3: Collect trial info and metadata from the columns
+        if not metadata_fields:
+            raise ValueError("No metadata fields found under 'Meta Data' marker.")
+        if metadata_end is None:
+            raise ValueError("No empty row found after metadata fields.")
+
+        print("Metadata fields:", metadata_fields)
+
+        # Step 3: Scan column 1 for first trial index "1"
+        trial_start = None
+        for r in range(meta_row, df.shape[0]):
+            val = df.iat[r, 1]
+            if str(val).strip() == "1":
+                trial_start = r
+                # print(f"First trial found at row {r}, column 1")
+                break
+
+        if trial_start is None:
+            raise ValueError("Could not find first trial index (1) in column 1.")
+
+        # Step 4: Determine number of trials by scanning col 1 until NaN
+        trial_indices = df.iloc[trial_start:, 1].dropna().astype(str)
+        trial_count = 0
+        for v in trial_indices:
+            if v.isnumeric():
+                trial_count += 1
+            else:
+                break
+
+        print(f"Detected {trial_count} trials")
+
+        # Step 5: Parse each investment column (col ≥ 2)
         group_data = []
-        metadata_fields = ['Name', 'ExpectedRevenue', 'BusinessUnit', 'ProductType']
-        num_rows = trial_df.shape[0]
-        trial_end_row = num_rows - 4
+        col_num = 0
+        for col in df.columns[2:]:
+            column_data = df[col].tolist()
 
-        for col in trial_df.columns[2:]:
-            column_data = trial_df[col].tolist()
-            trials = column_data[:trial_end_row]
-            metadata_values = column_data[trial_end_row:]
+            # Trials: trial_count rows starting at trial_start, force type coercion
+            """
+            Why force type coercion?
+            without type coercion: ~18.5 seconds for 250 portfolios
+            WITH type coercion: ~12.5 seconds for 250 portfolios
+                                ~24.5 seconds for 500 portfolios
+            """
+            trials = pd.to_numeric(
+                column_data[trial_start:trial_start + trial_count],
+                errors="coerce"
+            ).tolist()
+
+
+            # Metadata: immediately after trials
+            metadata_values = column_data[trial_start + trial_count: trial_start + trial_count + len(metadata_fields)]
+            metadata = dict(zip(metadata_fields, metadata_values))
 
             group_entry = {
-                "group_index": col - 2,
-                "metadata": dict(zip(metadata_fields, metadata_values)),
+                "group_index": col_num,
+                "metadata": metadata,
                 "trials": trials
             }
-
+            col_num+=1
             group_data.append(group_entry)
 
-        # print(group_data)
+        print(f"Parsed {len(group_data)} groups")
         return group_data
 
 
-def test_validation():
-    # create test case pairs of {filepath, bool}
-    # where filepath is the name of the file, bool is whether it should be expected or not
-    test_cases = {
-        "valid_file.xlsx" : True,
-        "capitalized_file.XLSX" : True,
-        "noExtensionFile" : False, 
-        "wrong_extension.xls" : False,
-        "invalid_file.txt" : False
-    }
-
-    print("Running Parser file validity check:\n")
-    for filepath, expected in test_cases.items():
-        try:
-            parser = SIPParser(filepath)
-            print(f"{filepath}: passed")
-            if not expected:
-                print(f"{filepath}: expected failure but passed")
-        except ValueError as e:
-            print(f"{filepath}: {e}")
-            if expected:
-                print(f"{filepath}: expected pass but failed")
-
 def test_parser():
     # create test case to test the parser functionality
-    test_parser = SIPParser("data/small_SIP.xlsx")
-
+    test_parser = SIPParser("data/mock_sipmath_v2.xlsx")
+    for g in test_parser.investments[:2]:
+        print("Group:", g["group_index"])
+        print("Metadata:", g["metadata"])
+        print("First 5 trials:", g["trials"][:5])
+        print("---")
 
 
 # main method to test current state of parser
 if __name__ == "__main__":
-    # test_validation()
     test_parser()
-
