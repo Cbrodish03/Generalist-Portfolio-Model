@@ -1,4 +1,5 @@
 import numpy as np
+import cvxpy as cp
 import variance_calcs as vc
 from parser import SIPParser
 
@@ -122,7 +123,26 @@ class Portfolio:
       """
 
       # TODO: implement framework for user-input desired return mu_p
-      mu_hat, sig_inverse, unit_vector = vc.create_matrices(group_data)
+      mu_hat, sig_matrix, unit_vector = vc.create_matrices(group_data)
+      n = len(mu_hat)
+
+      w = cp.Variable(n)
+      objective = cp.Minimize(cp.quad_form(w, sig_matrix))
+      constraints = [
+         mu_hat.T @ w == mu_p,
+         cp.sum(w) == 1,
+         w >= 0
+      ]
+
+      prob = cp.Problem(objective, constraints)
+      prob.solve(solver=cp.SCS)
+
+      if w.value is None:
+         raise ValueError("No feasible solution found for given target return.")
+      
+      weights = np.array(w.value).flatten()
+      return weights
+      """ sig_inverse = np.linalg.inv(sig_matrix)
       U = np.column_stack((mu_hat, unit_vector))
 
       # Matrix calculations
@@ -132,7 +152,7 @@ class Portfolio:
       u = u.transpose()
       weights = np.matmul(np.matmul(np.matmul(sig_inverse, U), M_inverse), u)
       
-      return weights
+      return weights """
 
 if __name__ == "__main__":
    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
