@@ -7,12 +7,20 @@ from sample_portfolios import RandomPortfolios
 
 class TooltipManager:
    def __init__(self, ax, canvas=None):
+      # Create MPL Artist to reference
       self.ax = ax
       self.fig = ax.figure
+
+      # Create array of scatter-plot data
       self.scatters = []
+      # Separate arrays for each dataset
       self.randpts = []
       self.effpts = []
+
+      # Configure hovering tooltip
       self.annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), arrowprops=dict(arrowstyle="->"))
+
+      # Tooltip visibility rules
       self.annot.set_visible(False)
       if canvas is None:
          self.canvas = self.fig.canvas
@@ -23,6 +31,7 @@ class TooltipManager:
       self.fig.canvas.mpl_connect("pick_event", self.on_pick)
    
    def add_scatter(self, *args, **kwargs):
+      """Add PathCollection to array, to be referenced by tooltip"""
       if "picker" not in kwargs:
          kwargs["picker"] = True
       sc = self.ax.scatter(*args, **kwargs)
@@ -30,6 +39,7 @@ class TooltipManager:
       return sc
 
    def update_annot(self, sc, ind):
+      """Update hovering tooltip with current cursor data"""
       pos = sc.get_offsets()[ind["ind"][0]]
       self.annot.xy = pos
       xval = np.around(pos[0], 2)
@@ -40,6 +50,7 @@ class TooltipManager:
       self.annot.get_bbox_patch().set_alpha(0.4)
    
    def hover(self, event):
+      """Control visibility of hovering tooltip"""
       vis = self.annot.get_visible()
       if event.inaxes == self.ax:
          for sc in self.scatters:
@@ -54,9 +65,12 @@ class TooltipManager:
             self.fig.canvas.draw_idle()
 
    def on_pick(self, event):
+      """Display additional portfolio information on cursor selection"""
+      # Differentiate between PathCollection points
       random = self.scatters[0]
       efficient = self.scatters[1]
 
+      # Displays different info for random vs. efficient port selected
       if event.artist == random:
          ind = int(event.ind)
          risk = np.around(np.sqrt(self.randpts[ind]['metadata']['Variance']), 2)
