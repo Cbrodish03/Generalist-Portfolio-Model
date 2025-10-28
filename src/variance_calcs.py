@@ -59,9 +59,7 @@ def create_matrices(group_data):
       if abs(det) < 1e-20:
          raise np.linalg.LinAlgError("Covariance matrix is singular even after tiny regularization.")
 
-   sig_inverse = np.linalg.inv(sig_matrix)
-
-   return mu_hat, sig_inverse, unit_vector
+   return mu_hat, sig_matrix, unit_vector
 
 def compute_coeffs(group_data):
    """
@@ -70,10 +68,11 @@ def compute_coeffs(group_data):
    :return a, b, c: coefficients in efficient frontier equation
    :return ymax: maximum average return value
    """
-   mu_hat, sig_inverse, unit_vector = create_matrices(group_data)
+   mu_hat, sig_matrix, unit_vector = create_matrices(group_data)
+   sig_inverse = np.linalg.inv(sig_matrix)
 
    # Finds maximum avg return value (for graphing purposes)(this should prob go somewhere else)
-   ymax = np.max(mu_hat.transpose())
+   ymax = np.max(mu_hat)
 
    # Computes individual terms in denominator expression
 

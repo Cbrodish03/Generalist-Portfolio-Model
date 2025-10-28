@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import cvxpy as cp
 import variance_calcs as vc
 from parser import SIPParser
 from portfolio import Portfolio
@@ -109,18 +110,18 @@ def plot_frontier(group_data):
    Plots the 'Markowitz bullet'/efficient frontier
    :param group_data: SIP trial data
    """
+   
    a, b, c, ymax = vc.compute_coeffs(group_data)
 
-   # Markowitz bullet equation
-   y = np.arange(b/(2 * a), ymax)
-   x = np.sqrt(a * (y ** 2) - b * y + c)
-
    eff_points = []
-   mu_p = b/(2 * a)
-   while mu_p <= ymax:
+   ymin = b / (2 * a)
+   mus = np.linspace(ymin, ymax, 50)    # 50 = num of eff ports drawn
+   for mu in mus:
       port = Portfolio()
-      eff_points.append(port.construct_port(group_data, 'e', mu_p))
-      mu_p += 10000
+      effpt = port.construct_port(group_data, 'e', mu)
+      
+      if np.all(effpt['weights'] >= 0):
+         eff_points.append(effpt)
    
    xs = []
    ys = []
