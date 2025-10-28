@@ -1,4 +1,5 @@
 import numpy as np
+import cvxpy as cp
 import variance_calcs as vc
 from parser import SIPParser
 
@@ -121,16 +122,32 @@ class Portfolio:
       """
 
       # TODO: implement framework for user-input desired return mu_p
-      mu_hat, sig_inverse, unit_vector = vc.create_matrices(group_data)
-      U = np.column_stack((mu_hat, unit_vector))
+      mu_hat, sig_matrix, unit_vector = vc.create_matrices(group_data)
+      n = len(mu_hat)
 
-      # Matrix calculations
-      M = np.matmul(np.matmul(U.transpose(), sig_inverse), U)
-      M_inverse = np.linalg.inv(M)
-      u = np.array([mu_p, 1])
-      u = u.transpose()
-      weights = np.matmul(np.matmul(np.matmul(sig_inverse, U), M_inverse), u)
+      # Define optimization variables
+      w = cp.Variable(n)
+      # Objective: minimize variance
+      objective = cp.Minimize(cp.quad_form(w, sig_matrix))
+      # Constraints: target return mu_p, sum-to-one, non-negativity
+      constraints = [
+         mu_hat.T @ w == mu_p,
+         cp.sum(w) == 1,
+         w >= 0
+      ]
+
+      # Solve quadratic program
+      prob = cp.Problem(objective, constraints)
+      prob.solve(solver=cp.SCS)
+
+      if w.value is None:
+         raise ValueError("No feasible solution found for given target return.")
       
+      weights = np.array(w.value).flatten()
+      # Trim floating-point errors
+      weights[np.abs(weights) < 1e-8] = 0
+      """if np.any(weights < -1e-6):
+         print("Warning: Infeasible solution or solver tolerance too loose.")"""
       return weights
 
 if __name__ == "__main__":
@@ -155,8 +172,10 @@ if __name__ == "__main__":
 
    # Test for efficient case:
    gen = Portfolio()
-   eff = gen.construct_port(group_data, 'e')
-   print(eff['metadata']['AverageReturn'], np.sqrt(eff['metadata']['Variance']), eff['weights'], sep=', ')
+   mu_p = int(input("Desired average return: "))
+   while mu_p != 0:
+      eff = gen.construct_port(group_data, 'e')
+      print(eff['metadata']['AverageReturn'], np.sqrt(eff['metadata']['Variance']), eff['weights'], sep=', ')
    
 
 
