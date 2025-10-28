@@ -4,7 +4,7 @@ import customtkinter
 import os
 import visualization
 from parser import SIPParser
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("dark-blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -51,13 +51,20 @@ class App(customtkinter.CTk):
         self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
 
         # create textbox (hidden by default)
-        self.textbox = customtkinter.CTkTextbox(self, width=250)
-        self.textbox.insert("0.0",
-                            "Description\n\nHere is where we give a quick description of the tool + how to use.\n\n"
-                            "This would include a setup guide and a hint at what the user is actually looking at\n\n"
-                            "Of course, this only exists when the user clicks the 'about me' button")
-        self.textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
-        self.textbox.grid_remove()  # start hidden
+        self.help_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
+        self.help_textbox.insert("0.0",
+                            "Getting started with the Generalist Portfolio Model\n" +
+                            "-------------------------------------------------------------------------------\n\n" +
+                            "1. Make sure your file adheres to the SIPmath 2.0 Standard and is found within the /data folder. Files are automatically scanned from this folder!\n\n" +
+                            "2. Once your file is selected from the dropdown menu, click parse to load the file and its content into the system.\n\n" +
+                            "3. Enter the number of samples (e.g. 250) and click 'Visualize'.\n\n" +
+                            "4. View the efficient frontier and portfolio data in the 'Graph' tab.\n\n" +
+                            "--- Frequently Asked Questions ---\n" +
+                            "NOTE: This section is a WIP.\n\n")
+
+        self.help_textbox.configure(state="disabled")
+        self.help_textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
+        self.help_textbox.grid_remove()  # start hidden
 
         # create tabview (visible by default)
         self.tabview = customtkinter.CTkTabview(self, width=250)
@@ -66,11 +73,11 @@ class App(customtkinter.CTk):
         self.tabview.tab("File Details").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
         self.tabview.tab("File Details").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
 
-        self.tabview.add("Tab 2")
-        self.tabview.tab("Tab 2").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
-        self.tabview.tab("Tab 2").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
+        self.tabview.add("Graph")
+        self.tabview.tab("Graph").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
+        self.tabview.tab("Graph").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
 
-        self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Tab 2"))    # give dedicated tab for Matplotlib fig.
+        self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Graph"))    # give dedicated tab for Matplotlib fig.
         self.graph_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         # scrollable textbox inside File Details tab
@@ -165,7 +172,7 @@ class App(customtkinter.CTk):
         self.file_details_textbox.configure(state="disabled")
 
     def run_visualization(self):
-        """Run visualization with the given sample count and show it in Tab 2."""
+        """Run visualization with the given sample count and show it in graph tab."""
         try:
             count = int(self.sample_entry.get())
             if not hasattr(self, "current_investments"):
@@ -188,6 +195,11 @@ class App(customtkinter.CTk):
             widget = canvas.get_tk_widget()
             widget.pack(fill="both", expand=True)
 
+            # add toolbar to graph
+            toolbar = NavigationToolbar2Tk(canvas, self.graph_frame)
+            toolbar.update()
+            toolbar.pack(fill="x")
+
             # IMPORTANT: re-bind the tooltip manager's canvas to the Tk canvas so events route correctly
             # For TooltipManager implementation above we can set tm.canvas to the FigureCanvasTkAgg object
             # and re-connect event handlers (we re-bind to ensure the correct canvas is used).
@@ -209,8 +221,8 @@ class App(customtkinter.CTk):
             self._last_sample_ports = sample_ports
             self._last_eff_pts = effpts
 
-            # Switch to Tab 2
-            self.tabview.set("Tab 2")
+            # Switch to graph tab
+            self.tabview.set("Graph")
 
         except ValueError:
             tkinter.messagebox.showerror("Invalid Input", "Please enter a valid integer.")
@@ -229,20 +241,22 @@ class App(customtkinter.CTk):
         customtkinter.set_widget_scaling(new_scaling_float)
 
     def home_button_event(self):
-        print("sidebar_button click")
-        self.textbox.grid_remove()  # remove text
+        # print("sidebar_button click")
+        self.help_textbox.grid_remove()  # remove text
         self.tabview.grid()     # re-add tabs
         self.file_selector.grid()   # re-add file selector
 
     def about_button_event(self):
-        print("about_button click")
+        # print("about_button click")
         self.tabview.grid_remove()  # remove tabs
         self.file_selector.grid_remove()    # remove file selector
-        self.textbox.grid()     # re-add text
+        self.help_textbox.grid_remove()
+        # self.help_textbox.grid()     # re-add text
 
     def help_button_event(self):
-        print("help_button click")
-        tkinter.messagebox.showinfo("Help", "This is where instructions will go.")
+        self.tabview.grid_remove()  # remove tabs
+        self.file_selector.grid_remove()    # remove file selector
+        self.help_textbox.grid()     # re-add text
 
 
 if __name__ == "__main__":
