@@ -52,7 +52,7 @@ class App(customtkinter.CTk):
 
         # settings frame
         self.settings_frame = customtkinter.CTkFrame(self)
-        self.settings_frame.grid(row=0, column=2, padx=(5, 5), pady=38, sticky="new")
+        self.settings_frame.grid(row=0, column=2, padx=(5, 5), pady=38, sticky="nsew")
 
         settings_label = customtkinter.CTkLabel(self.settings_frame, text="Portfolio Customization Options", font=("Segoe UI", 16, "bold"))
         settings_label.pack(pady=(5, 5))
@@ -104,6 +104,30 @@ class App(customtkinter.CTk):
         self.help_textbox.configure(state="disabled")
         self.help_textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
         self.help_textbox.grid_remove()  # start hidden
+
+        # about me textbox
+        # create textbox (hidden by default)
+        self.about_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
+        self.about_textbox.insert("0.0",
+                                 "---ABOUT THIS SOFTWARE---\n\n"
+                                 "This tool helps users analyze and compare different investment portfolios using "
+                                 "probabilistic simulation. It is designed to support decision-making under uncertainty "
+                                 "by illustrating how portfolio outcomes behave across many possible market conditions.\n\n"
+                                 "---CAPABILITIES---\n\n"
+                                 "-  Upload stochastic investment data in SIPmath 2.0 format\n"
+                                 "-  Generate multiple portfolios with Dirichlet sampling\n"
+                                 "-  Evaluate expected performance and risk\n"
+                                 "-  Toggle important financial factors (Winds of Fortune, Investment Tethering, ...)\n"
+                                 "-  View detailed portfolio comparison and risk/return statistics\n\n"
+                                 "---WHAT MAKES IT DIFFERENT---\n\n"
+                                 "1. Uses probabilistic instead of deterministic values.\n"
+                                 "2. Avoids oversimplified 'average return' assumptions.\n"
+                                 "3. Allows comparison of risk vs. reward visually.\n"
+                                 "4. Supports exploration and experimentation, rather than a single 'right' answer.")
+
+        self.about_textbox.configure(state="disabled")
+        self.about_textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
+        self.about_textbox.grid_remove()  # start hidden
 
         # create tabview (visible by default)
         self.tabview = customtkinter.CTkTabview(self, width=250)
@@ -281,7 +305,8 @@ class App(customtkinter.CTk):
 
     def home_button_event(self):
         # print("sidebar_button click")
-        self.help_textbox.grid_remove()     # remove text
+        self.help_textbox.grid_remove()     # remove help text
+        self.about_textbox.grid_remove()    # remove about text
         self.tabview.grid()                 # re-add tabs
         self.file_selector.grid()           # re-add file selector
         self.settings_frame.grid()          # re-add settings for portfolio generation
@@ -296,6 +321,7 @@ class App(customtkinter.CTk):
         self.settings_frame.grid_remove()       # remove settings
         self.parse_frame.grid_remove()          # remove parsing information
         self.portfolio_info_frame.grid_remove() # remove portfolio frame
+        self.about_textbox.grid()        # re-add about text
 
     def help_button_event(self):
         self.tabview.grid_remove()              # remove tabs
@@ -303,6 +329,7 @@ class App(customtkinter.CTk):
         self.settings_frame.grid_remove()       # remove settings
         self.parse_frame.grid_remove()          # remove parsing information
         self.portfolio_info_frame.grid_remove() # remove portfolio frame
+        self.about_textbox.grid_remove()        # remove about text
         self.help_textbox.grid()                # re-add text
 
 
