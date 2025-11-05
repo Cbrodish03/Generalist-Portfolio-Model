@@ -16,8 +16,8 @@ class App(customtkinter.CTk):
 
         # configure window
         self.title(" SIP Analyzer UI")
-        self.geometry(f"{700}x{600}")
-        self.minsize(700, 600)
+        self.geometry(f"{1000}x{600}")
+        self.minsize(1000, 600)
 
         # configure grid layout (4x4)
         self.grid_columnconfigure((1, 2, 3), weight=1)
@@ -49,6 +49,45 @@ class App(customtkinter.CTk):
         self.scaling_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["80%", "90%", "100%", "110%", "120%"],
                                                                command=self.change_scaling_event)
         self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
+
+        # settings frame
+        self.settings_frame = customtkinter.CTkFrame(self)
+        self.settings_frame.grid(row=0, column=2, padx=(5, 5), pady=38, sticky="new")
+
+        settings_label = customtkinter.CTkLabel(self.settings_frame, text="Portfolio Customization Options", font=("Segoe UI", 16, "bold"))
+        settings_label.pack(pady=(5, 5))
+
+        # Togglable features (no functionality yet)
+        self.toggle_negative_weights = customtkinter.CTkCheckBox(self.settings_frame, text="Allow Negative Weights (Short Selling)")
+        self.toggle_investment_tethering = customtkinter.CTkCheckBox(self.settings_frame, text="Enable Investment Tethering")
+        self.toggle_high_risk_mode = customtkinter.CTkCheckBox(self.settings_frame, text="Allow High-Risk Portfolio Region")
+        self.toggle_efficient_frontier = customtkinter.CTkCheckBox(self.settings_frame, text="Toggle Efficient Frontier")
+
+        self.toggle_negative_weights.pack(anchor="w", pady=3)
+        self.toggle_investment_tethering.pack(anchor="w", pady=3)
+        self.toggle_high_risk_mode.pack(anchor="w", pady=3)
+        self.toggle_efficient_frontier.pack(anchor="w", pady=3)
+
+        # portfolio information frame
+        self.portfolio_info_frame = customtkinter.CTkFrame(self)
+        self.portfolio_info_frame.grid(row=1, column=2, padx=(5, 5), pady=0, sticky="new")
+        # portfolio info label
+        portfolio_info_label = customtkinter.CTkLabel(self.portfolio_info_frame, text="Portfolio Information",
+                                                      font=("Segoe UI", 16, "bold"))
+        portfolio_info_label.pack(pady=(5, 5))
+        # portfolio info text
+        # portfolio_info_text = customtkinter.CTkTextbox(self.portfolio_info_frame, wrap="word", state="disabled")
+        # portfolio_info_text.pack(pady=(5, 5))
+
+        self.portfolio_info_text = customtkinter.CTkTextbox(
+            self.portfolio_info_frame,
+            wrap="word",
+            state="disabled",
+            width=250,   # adjust if needed
+            # height=200
+        )
+        self.portfolio_info_text.pack(pady=(5, 5))
+
 
         # create textbox (hidden by default)
         self.help_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
@@ -187,7 +226,7 @@ class App(customtkinter.CTk):
                 widget.destroy()
 
             # Get figure and tooltip manager from visualization module
-            fig, tm, sample_ports, effpts = visualization.visualize_portfolios(self.current_investments, count)
+            fig, tm, sample_ports, effpts = visualization.visualize_portfolios(self.current_investments, count, self.portfolio_info_text)
 
             # Embed figure in the Tkinter tab
             canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
@@ -242,21 +281,29 @@ class App(customtkinter.CTk):
 
     def home_button_event(self):
         # print("sidebar_button click")
-        self.help_textbox.grid_remove()  # remove text
-        self.tabview.grid()     # re-add tabs
-        self.file_selector.grid()   # re-add file selector
+        self.help_textbox.grid_remove()     # remove text
+        self.tabview.grid()                 # re-add tabs
+        self.file_selector.grid()           # re-add file selector
+        self.settings_frame.grid()          # re-add settings for portfolio generation
+        self.parse_frame.grid()             # re-add parsing information
+        self.portfolio_info_frame.grid()    # re-add portfolio frame
 
     def about_button_event(self):
         # print("about_button click")
-        self.tabview.grid_remove()  # remove tabs
-        self.file_selector.grid_remove()    # remove file selector
-        self.help_textbox.grid_remove()
-        # self.help_textbox.grid()     # re-add text
+        self.tabview.grid_remove()              # remove tabs
+        self.file_selector.grid_remove()        # remove file selector
+        self.help_textbox.grid_remove()         # remove help text
+        self.settings_frame.grid_remove()       # remove settings
+        self.parse_frame.grid_remove()          # remove parsing information
+        self.portfolio_info_frame.grid_remove() # remove portfolio frame
 
     def help_button_event(self):
-        self.tabview.grid_remove()  # remove tabs
-        self.file_selector.grid_remove()    # remove file selector
-        self.help_textbox.grid()     # re-add text
+        self.tabview.grid_remove()              # remove tabs
+        self.file_selector.grid_remove()        # remove file selector
+        self.settings_frame.grid_remove()       # remove settings
+        self.parse_frame.grid_remove()          # remove parsing information
+        self.portfolio_info_frame.grid_remove() # remove portfolio frame
+        self.help_textbox.grid()                # re-add text
 
 
 if __name__ == "__main__":

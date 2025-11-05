@@ -7,10 +7,13 @@ from portfolio import Portfolio
 from sample_portfolios import RandomPortfolios
 
 class TooltipManager:
-   def __init__(self, ax, canvas=None):
+   def __init__(self, ax, info_textbox=None, canvas=None):
       # Create MPL Artist to reference
       self.ax = ax
       self.fig = ax.figure
+      self.info_textbox = info_textbox # textbox reference for UI
+
+      self.asset_names = []
 
       # Create array of scatter-plot data
       self.scatters = []
@@ -30,6 +33,22 @@ class TooltipManager:
 
       self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
       self.fig.canvas.mpl_connect("pick_event", self.on_pick)
+
+   def display_info(self, text):
+      if self.info_textbox is None:
+         return # UI not connected yet
+
+      self.info_textbox.configure(state="normal")
+      self.info_textbox.delete("1.0", "end")
+      self.info_textbox.insert("end", text)
+      self.info_textbox.configure(state="disabled")
+
+   def format_weights(self, weights):
+      lines = ["Weights:"]
+      for i, w in enumerate(weights, start=1):
+         name = self.asset_names[i-1]
+         lines.append(f"  {i}. {name:<20} {w * 100:.8f}%")
+      return "\n".join(lines)
    
    def add_scatter(self, *args, **kwargs):
       """Add PathCollection to array, to be referenced by tooltip"""
@@ -66,24 +85,72 @@ class TooltipManager:
             self.fig.canvas.draw_idle()
 
    def on_pick(self, event):
-      """Display additional portfolio information on cursor selection"""
-      # Differentiate between PathCollection points
-      random = self.scatters[0]
-      efficient = self.scatters[1]
+      """
+      Handles displaying portfolio information from the graph
+      If multiple portfolios exist in the same event, we pick the closest to the user's cursor position
+      :param event: the event we get from the handler
+      """
+      try:
+         artist = event.artist
+         if not hasattr(event, "ind"):
+            return
+         inds = np.atleast_1d(event.ind)  # ensures array-like
 
-      # Displays different info for random vs. efficient port selected
-      if event.artist == random:
-         ind = int(event.ind)
-         risk = np.around(np.sqrt(self.randpts[ind]['metadata']['Variance']), 2)
-         avreturn = np.around(self.randpts[ind]['metadata']['AverageReturn'], 2)
-         weights = self.randpts[ind]['weights']
-         print(f"Random Portfolio #{ind + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
-      elif event.artist == efficient:
-         ind = int(event.ind)
-         avreturn = np.around(self.effpts[ind]['metadata']['AverageReturn'], 2)
-         risk = np.around(np.sqrt(self.effpts[ind]['metadata']['Variance']), 2)
-         weights = self.effpts[ind]['weights']
-         print(f"Efficient Portfolio #{ind + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+         # get mouse click position in data coords (fallback if missing)
+         me = getattr(event, "mouseevent", None)
+         if me is None or me.xdata is None or me.ydata is None:
+            # if mouse coords not available, just take the first index
+            idx = int(inds[0])
+         else:
+            mx, my = me.xdata, me.ydata
+
+            # get offsets for this artist (scatter)
+            offsets = artist.get_offsets()
+            if offsets is None or len(offsets) == 0:
+               idx = int(inds[0])
+            else:
+               # extract candidate points' coordinates
+               cand = offsets[inds]  # shape (k, 2)
+               # compute squared distances in data space
+               d2 = np.sum((cand - np.array([mx, my]))**2, axis=1)
+               # pick index of smallest distance among candidates
+               best_rel = np.argmin(d2)
+               idx = int(inds[best_rel])
+
+         # now idx is a single integer index we can safely use
+         # determine which scatter was clicked and respond
+         if len(self.scatters) >= 2 and artist == self.scatters[0]:
+            # random portfolios
+            if idx < len(self.randpts):
+               risk = np.around(np.sqrt(self.randpts[idx]['metadata']['Variance']), 2)
+               avreturn = np.around(self.randpts[idx]['metadata']['AverageReturn'], 2)
+               weights = self.randpts[idx]['weights']
+               # print(f"Random Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+               weight_text = self.format_weights(weights)
+               self.display_info(
+                  f"Random Portfolio #{idx + 1}\n"
+                  f"Average Return: ${avreturn}\n"
+                  f"Risk (Std Dev): ${risk}\n\n"
+                  f"{weight_text}"
+               )
+         elif len(self.scatters) >= 2 and artist == self.scatters[1]:
+            # efficient portfolios
+            if idx < len(self.effpts):
+               avreturn = np.around(self.effpts[idx]['metadata']['AverageReturn'], 2)
+               risk = np.around(np.sqrt(self.effpts[idx]['metadata']['Variance']), 2)
+               weights = self.effpts[idx]['weights']
+               # print(f"Efficient Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+               weight_text = self.format_weights(weights)
+               self.display_info(
+                  f"Efficient Portfolio #{idx + 1}\n"
+                  f"Average Return: ${avreturn}\n"
+                  f"Risk (Std Dev): ${risk}\n\n"
+                  f"{weight_text}"
+               )
+
+      except Exception as e:
+         # Defensive: avoid crashing the app on unexpected pick-event structures
+         print("Error in on_pick:", e)
 
    
 
@@ -132,7 +199,7 @@ def plot_frontier(group_data):
    # plt.plot(x, y, 'r', ls='--')
    return xs, ys, eff_points
 
-def visualize_portfolios(group_data, count):
+def visualize_portfolios(group_data, count, info_textbox=None):
    """
    Generates random portfolios and plots them with efficient frontier
    :param group_data: samples to generate with
@@ -143,9 +210,12 @@ def visualize_portfolios(group_data, count):
 
    rx, ry = plot_rand(sample_ports)
    ex, ey, effpts = plot_frontier(group_data)
+
+   asset_names = [item['metadata']['Name'] for item in group_data]
    
-   fig, ax = plt.subplots()
-   tm = TooltipManager(ax)
+   fig, ax = plt.subplots(dpi=150)
+   tm = TooltipManager(ax, info_textbox)
+   tm.asset_names = asset_names
    tm.add_scatter(rx, ry, c='b', s=15, picker=True, pickradius=5)
    tm.add_scatter(ex, ey, c='r', marker='*', picker=True, pickradius=5)
    tm.randpts = sample_ports
