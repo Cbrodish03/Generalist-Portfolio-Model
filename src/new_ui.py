@@ -1,10 +1,10 @@
+import os
 import tkinter
 import tkinter.messagebox
 import customtkinter
-import os
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import visualization
 from parser import SIPParser
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("dark-blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -19,6 +19,8 @@ class App(customtkinter.CTk):
         self.geometry(f"{1000}x{600}")
         self.minsize(1000, 600)
 
+        self.current_frame = 'home'
+
         # configure grid layout (4x4)
         self.grid_columnconfigure((1, 2, 3), weight=1)
         self.grid_rowconfigure((0, 1, 2), weight=1)
@@ -28,53 +30,71 @@ class App(customtkinter.CTk):
         self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
         # logo
-        self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="| Navigation Menu |", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="| Navigation Menu |",
+                                                 font=customtkinter.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
         # sidebar buttons
-        self.sidebar_button_home = customtkinter.CTkButton(self.sidebar_frame, text="Home", command=self.home_button_event)
+        self.sidebar_button_home = customtkinter.CTkButton(self.sidebar_frame, text="🏠 Home",
+                                                           command=self.home_button_event)
         self.sidebar_button_home.grid(row=1, column=0, padx=20, pady=10)
-        self.sidebar_button_about = customtkinter.CTkButton(self.sidebar_frame, text="About Me", command=self.about_button_event)
+        self.sidebar_button_about = customtkinter.CTkButton(self.sidebar_frame, text="🔎 About Me",
+                                                            command=self.about_button_event)
         self.sidebar_button_about.grid(row=2, column=0, padx=20, pady=10)
-        self.sidebar_button_help = customtkinter.CTkButton(self.sidebar_frame, text="Help", command=self.help_button_event)
+        self.sidebar_button_help = customtkinter.CTkButton(self.sidebar_frame, text="❔ Help",
+                                                           command=self.help_button_event)
         self.sidebar_button_help.grid(row=3, column=0, padx=20, pady=10)
         # appearance menu
         self.appearance_mode_label = customtkinter.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
         self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
-        self.appearance_mode_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
+        self.appearance_mode_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame,
+                                                                       values=["Light", "Dark", "System"],
                                                                        command=self.change_appearance_mode_event)
         self.appearance_mode_optionemenu.grid(row=6, column=0, padx=20, pady=(10, 10))
         # scaling menu
         self.scaling_label = customtkinter.CTkLabel(self.sidebar_frame, text="UI Scaling:", anchor="w")
         self.scaling_label.grid(row=7, column=0, padx=20, pady=(10, 0))
-        self.scaling_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["80%", "90%", "100%", "110%", "120%"],
+        self.scaling_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame,
+                                                               values=["80%", "90%", "100%", "110%", "120%"],
                                                                command=self.change_scaling_event)
         self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
 
         # settings frame
         self.settings_frame = customtkinter.CTkFrame(self)
-        self.settings_frame.grid(row=0, column=2, padx=(5, 5), pady=38, sticky="nsew")
+        self.settings_frame.grid(row=0, column=2, padx=(10, 10), pady=(38, 5), sticky="nsew")
+        self.settings_frame.grid_columnconfigure(2, weight=1)
 
-        settings_label = customtkinter.CTkLabel(self.settings_frame, text="Portfolio Customization Options", font=("Segoe UI", 16, "bold"))
+        settings_label = customtkinter.CTkLabel(self.settings_frame, text="Portfolio Customization Options",
+                                                font=("Segoe UI", 16, "bold"))
         settings_label.pack(pady=(5, 5))
 
         # Togglable features (no functionality yet)
-        self.toggle_negative_weights = customtkinter.CTkCheckBox(self.settings_frame, text="Allow Negative Weights (Short Selling)")
-        self.toggle_investment_tethering = customtkinter.CTkCheckBox(self.settings_frame, text="Enable Investment Tethering")
-        self.toggle_high_risk_mode = customtkinter.CTkCheckBox(self.settings_frame, text="Allow High-Risk Portfolio Region")
-        self.toggle_efficient_frontier = customtkinter.CTkCheckBox(self.settings_frame, text="Toggle Efficient Frontier")
+        self.toggle_negative_weights = customtkinter.CTkCheckBox(self.settings_frame,
+                                                                 text="Allow Negative Weights (Short Selling)")
+        self.toggle_investment_tethering = customtkinter.CTkCheckBox(self.settings_frame,
+                                                                     text="Enable Investment Tethering")
+        self.toggle_high_risk_mode = customtkinter.CTkCheckBox(self.settings_frame,
+                                                               text="Allow High-Risk Portfolio Region")
+        self.toggle_efficient_frontier = customtkinter.CTkCheckBox(self.settings_frame,
+                                                                   text="Toggle Efficient Frontier",
+                                                                   command=self.toggle_frontier)
 
         self.toggle_negative_weights.pack(anchor="w", pady=3)
         self.toggle_investment_tethering.pack(anchor="w", pady=3)
         self.toggle_high_risk_mode.pack(anchor="w", pady=3)
         self.toggle_efficient_frontier.pack(anchor="w", pady=3)
+        self.toggle_efficient_frontier.select()
 
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
-        self.portfolio_info_frame.grid(row=1, column=2, padx=(5, 5), pady=0, sticky="new")
+        self.portfolio_info_frame.grid(row=1, column=2, rowspan=4, padx=(10, 10), pady=(5, 10), sticky="nesw")
+        self.portfolio_info_frame.grid_rowconfigure(0, weight=0)
+        self.portfolio_info_frame.grid_rowconfigure(2, weight=1)
+        self.portfolio_info_frame.grid_columnconfigure(0, weight=1)
         # portfolio info label
         portfolio_info_label = customtkinter.CTkLabel(self.portfolio_info_frame, text="Portfolio Information",
                                                       font=("Segoe UI", 16, "bold"))
-        portfolio_info_label.pack(pady=(5, 5))
+        portfolio_info_label.grid(rowspan=2, padx=(5, 5), pady=(5, 5), sticky='new')
+
         # portfolio info text
         # portfolio_info_text = customtkinter.CTkTextbox(self.portfolio_info_frame, wrap="word", state="disabled")
         # portfolio_info_text.pack(pady=(5, 5))
@@ -82,24 +102,23 @@ class App(customtkinter.CTk):
         self.portfolio_info_text = customtkinter.CTkTextbox(
             self.portfolio_info_frame,
             wrap="word",
-            state="disabled",
-            width=250,   # adjust if needed
-            # height=200
+            state="disabled"
         )
-        self.portfolio_info_text.pack(pady=(5, 5))
-
+        self.portfolio_info_text.grid(row=2, column=0, padx=(10, 10), pady=(0, 10), sticky='nesw')
 
         # create textbox (hidden by default)
         self.help_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
         self.help_textbox.insert("0.0",
-                            "Getting started with the Generalist Portfolio Model\n" +
-                            "-------------------------------------------------------------------------------\n\n" +
-                            "1. Make sure your file adheres to the SIPmath 2.0 Standard and is found within the /data folder. Files are automatically scanned from this folder!\n\n" +
-                            "2. Once your file is selected from the dropdown menu, click parse to load the file and its content into the system.\n\n" +
-                            "3. Enter the number of samples (e.g. 250) and click 'Visualize'.\n\n" +
-                            "4. View the efficient frontier and portfolio data in the 'Graph' tab.\n\n" +
-                            "--- Frequently Asked Questions ---\n" +
-                            "NOTE: This section is a WIP.\n\n")
+                                 "Getting started with the Generalist Portfolio Model\n" +
+                                 "-------------------------------------------------------------------------------\n\n" +
+                                 "1. Make sure your file adheres to the SIPmath 2.0 Standard and is found within the "
+                                 "/data folder. Files are automatically scanned from this folder!\n\n" +
+                                 "2. Once your file is selected from the dropdown menu, click parse to load the file "
+                                 "and its content into the system.\n\n" +
+                                 "3. Enter the number of samples (e.g. 250) and click 'Visualize'.\n\n" +
+                                 "4. View the efficient frontier and portfolio data in the 'Graph' tab.\n\n" +
+                                 "--- Frequently Asked Questions ---\n" +
+                                 "NOTE: This section is a WIP.\n\n")
 
         self.help_textbox.configure(state="disabled")
         self.help_textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
@@ -109,21 +128,22 @@ class App(customtkinter.CTk):
         # create textbox (hidden by default)
         self.about_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
         self.about_textbox.insert("0.0",
-                                 "---ABOUT THIS SOFTWARE---\n\n"
-                                 "This tool helps users analyze and compare different investment portfolios using "
-                                 "probabilistic simulation. It is designed to support decision-making under uncertainty "
-                                 "by illustrating how portfolio outcomes behave across many possible market conditions.\n\n"
-                                 "---CAPABILITIES---\n\n"
-                                 "-  Upload stochastic investment data in SIPmath 2.0 format\n"
-                                 "-  Generate multiple portfolios with Dirichlet sampling\n"
-                                 "-  Evaluate expected performance and risk\n"
-                                 "-  Toggle important financial factors (Winds of Fortune, Investment Tethering, ...)\n"
-                                 "-  View detailed portfolio comparison and risk/return statistics\n\n"
-                                 "---WHAT MAKES IT DIFFERENT---\n\n"
-                                 "1. Uses probabilistic instead of deterministic values.\n"
-                                 "2. Avoids oversimplified 'average return' assumptions.\n"
-                                 "3. Allows comparison of risk vs. reward visually.\n"
-                                 "4. Supports exploration and experimentation, rather than a single 'right' answer.")
+                                  "---ABOUT THIS SOFTWARE---\n\n"
+                                  "This tool helps users analyze and compare different investment portfolios using "
+                                  "probabilistic simulation. It is designed to support decision-making under "
+                                  "uncertainty by illustrating how portfolio outcomes behave across many possible "
+                                  "market conditions.\n\n"
+                                  "---CAPABILITIES---\n\n"
+                                  "-  Upload stochastic investment data in SIPmath 2.0 format\n"
+                                  "-  Generate multiple portfolios with Dirichlet sampling\n"
+                                  "-  Evaluate expected performance and risk\n"
+                                  "-  Toggle important financial factors (Winds of Fortune, Investment Tethering, ...)\n"
+                                  "-  View detailed portfolio comparison and risk/return statistics\n\n"
+                                  "---WHAT MAKES IT DIFFERENT---\n\n"
+                                  "1. Uses probabilistic instead of deterministic values.\n"
+                                  "2. Avoids oversimplified 'average return' assumptions.\n"
+                                  "3. Allows comparison of risk vs. reward visually.\n"
+                                  "4. Supports exploration and experimentation, rather than a single 'right' answer.")
 
         self.about_textbox.configure(state="disabled")
         self.about_textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 20), sticky="nsew")
@@ -140,7 +160,7 @@ class App(customtkinter.CTk):
         self.tabview.tab("Graph").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
         self.tabview.tab("Graph").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
 
-        self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Graph"))    # give dedicated tab for Matplotlib fig.
+        self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Graph"))  # give dedicated tab for Matplotlib fig.
         self.graph_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         # scrollable textbox inside File Details tab
@@ -183,7 +203,6 @@ class App(customtkinter.CTk):
         # set default values
         self.appearance_mode_optionemenu.set("Dark")
         self.scaling_optionemenu.set("100%")
-
 
     def get_data_files(self):
         """Return list of files from the data directory"""
@@ -234,6 +253,19 @@ class App(customtkinter.CTk):
         self.file_details_textbox.insert("0.0", text)
         self.file_details_textbox.configure(state="disabled")
 
+    def toggle_frontier(self):
+        """Show / hide the efficient frontier line on the graph."""
+        is_checked = self.toggle_efficient_frontier.get()  # True or False
+
+        if hasattr(self, "_frontier_line"):
+            self._frontier_line.set_visible(is_checked)
+
+        if hasattr(self, "_eff_scatter"):
+            self._eff_scatter.set_visible(is_checked)
+
+        if hasattr(self, "_last_canvas"):
+            self._last_canvas.draw()
+
     def run_visualization(self):
         """Run visualization with the given sample count and show it in graph tab."""
         try:
@@ -250,7 +282,12 @@ class App(customtkinter.CTk):
                 widget.destroy()
 
             # Get figure and tooltip manager from visualization module
-            fig, tm, sample_ports, effpts = visualization.visualize_portfolios(self.current_investments, count, self.portfolio_info_text)
+            fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
+                self.current_investments, count, self.portfolio_info_text
+            )
+
+            self._frontier_line = frontier_line
+            self._eff_scatter = eff_scatter
 
             # Embed figure in the Tkinter tab
             canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
@@ -302,35 +339,47 @@ class App(customtkinter.CTk):
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         customtkinter.set_widget_scaling(new_scaling_float)
+        if self.current_frame == "home":
+            self.home_button_event()
+        elif self.current_frame == "about":
+            self.about_button_event()
+        elif self.current_frame == "help":
+            self.about_button_event()
 
     def home_button_event(self):
         # print("sidebar_button click")
-        self.help_textbox.grid_remove()     # remove help text
-        self.about_textbox.grid_remove()    # remove about text
-        self.tabview.grid()                 # re-add tabs
-        self.file_selector.grid()           # re-add file selector
-        self.settings_frame.grid()          # re-add settings for portfolio generation
-        self.parse_frame.grid()             # re-add parsing information
-        self.portfolio_info_frame.grid()    # re-add portfolio frame
+        self.help_textbox.grid_remove()  # remove help text
+        self.about_textbox.grid_remove()  # remove about text
+        self.tabview.grid()  # re-add tabs
+        self.file_selector.grid()  # re-add file selector
+        self.settings_frame.grid()  # re-add settings for portfolio generation
+        self.parse_frame.grid()  # re-add parsing information
+        self.portfolio_info_frame.grid()  # re-add portfolio frame
+
+        self.current_frame = "home"
 
     def about_button_event(self):
         # print("about_button click")
-        self.tabview.grid_remove()              # remove tabs
-        self.file_selector.grid_remove()        # remove file selector
-        self.help_textbox.grid_remove()         # remove help text
-        self.settings_frame.grid_remove()       # remove settings
-        self.parse_frame.grid_remove()          # remove parsing information
-        self.portfolio_info_frame.grid_remove() # remove portfolio frame
-        self.about_textbox.grid()        # re-add about text
+        self.tabview.grid_remove()  # remove tabs
+        self.file_selector.grid_remove()  # remove file selector
+        self.help_textbox.grid_remove()  # remove help text
+        self.settings_frame.grid_remove()  # remove settings
+        self.parse_frame.grid_remove()  # remove parsing information
+        self.portfolio_info_frame.grid_remove()  # remove portfolio frame
+        self.about_textbox.grid()  # re-add about text
+
+        self.current_frame = "about"
 
     def help_button_event(self):
-        self.tabview.grid_remove()              # remove tabs
-        self.file_selector.grid_remove()        # remove file selector
-        self.settings_frame.grid_remove()       # remove settings
-        self.parse_frame.grid_remove()          # remove parsing information
-        self.portfolio_info_frame.grid_remove() # remove portfolio frame
-        self.about_textbox.grid_remove()        # remove about text
-        self.help_textbox.grid()                # re-add text
+        self.tabview.grid_remove()  # remove tabs
+        self.file_selector.grid_remove()  # remove file selector
+        self.settings_frame.grid_remove()  # remove settings
+        self.parse_frame.grid_remove()  # remove parsing information
+        self.portfolio_info_frame.grid_remove()  # remove portfolio frame
+        self.about_textbox.grid_remove()  # remove about text
+        self.help_textbox.grid()  # re-add text
+
+        self.current_frame = "help"
 
 
 if __name__ == "__main__":
