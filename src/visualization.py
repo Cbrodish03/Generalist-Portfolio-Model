@@ -186,7 +186,7 @@ def plot_frontier(group_data):
     a, b, c, ymax = vc.compute_coeffs(group_data)
 
     eff_points = []
-    ymin = b / (2 * a)
+    ymin = b / (2 * a)      # Ballpark min average return
     mus = np.linspace(ymin, ymax, 50)  # 50 = num of eff ports drawn
     for mu in mus:
         port = Portfolio()
@@ -195,6 +195,16 @@ def plot_frontier(group_data):
         if np.all(effpt['weights'] >= 0):
             eff_points.append(effpt)
 
+    # Filter out efficient ports below min variance port (fix bending)
+    # Compute standard deviations for all points
+    stds = [np.sqrt(p['metadata']['Variance']) for p in eff_points]
+
+    # Find index of minimum variance (i.e. bottom of the U)
+    min_var_idx = int(np.argmin(stds))
+
+    # Keep only points ABOVE (to the right of) the min-var portfolio
+    eff_points = eff_points[min_var_idx:]
+    
     xs = []
     ys = []
     for i in range(len(eff_points)):
