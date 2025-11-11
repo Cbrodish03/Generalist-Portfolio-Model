@@ -236,7 +236,15 @@ class App(customtkinter.CTk):
                 meta = inv["metadata"]
                 # dynamically add metadata fields
                 for k, v in meta.items():
-                    summary_text += f"   {k}: {v}\n"
+                    try:
+                        if "revenue" in k.lower() or "cost" in k.lower():
+                            display_value = visualization.format_currency(v)
+                        else:
+                            display_value = v
+                    except Exception:
+                        display_value = v
+                    summary_text += f"   {k}: {display_value}\n"
+
                 trials = inv["trials"]
                 summary_text += f"   Trials: {len(trials)} total | First 5: {trials[:5]}\n"
 

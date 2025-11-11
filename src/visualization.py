@@ -69,8 +69,13 @@ class TooltipManager:
         self.annot.xy = pos
         xval = np.around(pos[0], 2)
         yval = np.around(pos[1], 2)
+        try:
+            ytext = format_currency(float(yval))
+        except Exception:
+            ytext = yval
+
         index = sc.format_cursor_data(ind["ind"] + 1)
-        text = f"{index}\n({xval}, {yval})"
+        text = f"{index}\n({xval}, {ytext})"
         self.annot.set_text(text)
         self.annot.get_bbox_patch().set_alpha(0.4)
 
@@ -134,8 +139,8 @@ class TooltipManager:
                     weight_text = self.format_weights(weights)
                     self.display_info(
                         f"Random Portfolio #{idx + 1}\n"
-                        f"Average Return: ${avreturn}\n"
-                        f"Risk (Std Dev): ${risk}\n\n"
+                        f"Average Return: {format_currency(avreturn)}\n"
+                        f"Risk (Std Dev): {risk}\n\n"
                         f"{weight_text}"
                     )
             elif len(self.scatters) >= 2 and artist == self.scatters[1]:
@@ -148,8 +153,8 @@ class TooltipManager:
                     weight_text = self.format_weights(weights)
                     self.display_info(
                         f"Efficient Portfolio #{idx + 1}\n"
-                        f"Average Return: ${avreturn}\n"
-                        f"Risk (Std Dev): ${risk}\n\n"
+                        f"Average Return: {format_currency(avreturn)}\n"
+                        f"Risk (Std Dev): {risk}\n\n"
                         f"{weight_text}"
                     )
 
@@ -266,6 +271,10 @@ def update_frontier_visibility(self):
 def toggle_efficient_frontier(self):
     self.show_efficient_frontier = not self.show_efficient_frontier
     self.update_frontier_visibility()
+
+def format_currency(value):
+    """Formats a number as currency with two decimal places and a dollar sign."""
+    return f"${value:,.2f}"
 
 
 """ def pareto_plot(group_data, count):
