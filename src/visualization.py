@@ -220,7 +220,7 @@ def plot_frontier(group_data):
     return xs, ys, eff_points
 
 
-def visualize_portfolios(group_data, count, info_textbox=None):
+def visualize_portfolios(group_data, count, info_textbox=None, plot=False):
     """
     Generates random portfolios and plots them with efficient frontier
     :param group_data: samples to generate with
@@ -258,6 +258,9 @@ def visualize_portfolios(group_data, count, info_textbox=None):
     # plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
     # plt.grid(ls="--")
     # plt.show()   # swap to returning the figure for integration with UI
+    if plot:
+        plt.show()
+
     return fig, tm, sample_ports, effpts, frontier_line, eff_scatter
 
 
@@ -298,10 +301,30 @@ def format_currency(value):
    plt.scatter(pfx, pfy, marker='*')
    plt.show() """
 
-if __name__ == "__main__":
-    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    # SLURP = SIPParser("data/small_SIP.xlsx")
-    group_data = SLURP.investments
+def test_winds_plot():
+    # create test case to test the parser functionality
+    test_parser = SIPParser("data/mock_sipmath_v2.xlsx")
+
+    test_winds_parser = SIPParser("data/Winds_of_Fortune_Template.xlsx")
+
+    test_winds_sip_parser = SIPParser("data/Winds_of_Fortune_SIP.xlsx")
+
+    # test winds application
+    adjusted_sips = test_parser.apply_winds(
+        simulated_groups=test_parser.investments,
+        template_groups=test_winds_parser.investments,
+        wind_groups=test_winds_sip_parser.investments)
+
+    # group_data = adjusted_sips
     count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
-    visualize_portfolios(group_data, count=count)
+    visualize_portfolios(adjusted_sips, count=count, plot=True)
+
+
+if __name__ == "__main__":
+    # SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
+    # # SLURP = SIPParser("data/small_SIP.xlsx")
+    # group_data = SLURP.investments
+    # count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
+    # visualize_portfolios(group_data, count=count, plot=True)
     # pareto_plot(group_data, count=count)
+    test_winds_plot()

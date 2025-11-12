@@ -3,6 +3,7 @@ import tkinter
 import tkinter.messagebox
 import customtkinter
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
 import visualization
 from parser import SIPParser
 
@@ -20,6 +21,12 @@ class App(customtkinter.CTk):
         self.minsize(1000, 600)
 
         self.current_frame = 'home'
+
+        # wind information
+        self.sip_file = None                # path to main SIP file
+        self.winds_template_file = None     # path to template file
+        self.winds_sip_file = None          # path to winds SIP file
+
 
         # configure grid layout (4x4)
         self.grid_columnconfigure((1, 2, 3), weight=1)
@@ -83,6 +90,48 @@ class App(customtkinter.CTk):
         self.toggle_high_risk_mode.pack(anchor="w", pady=3)
         self.toggle_efficient_frontier.pack(anchor="w", pady=3)
         self.toggle_efficient_frontier.select()
+        self.toggle_winds_of_fortune = customtkinter.CTkCheckBox(
+            self.settings_frame,
+            text="Use Winds of Fortune"
+        )
+        self.toggle_winds_of_fortune.pack(anchor="w", pady=3)
+
+        # Winds of Fortune Configuration Section
+        self.winds_frame = customtkinter.CTkFrame(self)
+        self.winds_frame.grid(row=4, column=1, padx=(20, 0), pady=(0, 20), sticky="ew")
+
+        winds_label = customtkinter.CTkLabel(
+            self.winds_frame,
+            text="🌪 Winds of Fortune Configuration",
+            font=("Segoe UI", 15, "bold")
+        )
+        winds_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+
+        # Winds Template File selector
+        self.winds_template_label = customtkinter.CTkLabel(self.winds_frame, text="Template File:")
+        self.winds_template_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+
+        self.winds_template_selector = customtkinter.CTkOptionMenu(
+            self.winds_frame, values=self.get_data_files()
+        )
+        self.winds_template_selector.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
+
+        # Winds SIP File selector
+        self.winds_sip_label = customtkinter.CTkLabel(self.winds_frame, text="Winds SIP File:")
+        self.winds_sip_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+
+        self.winds_sip_selector = customtkinter.CTkOptionMenu(
+            self.winds_frame, values=self.get_data_files()
+        )
+        self.winds_sip_selector.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+
+        # Apply Winds Button
+        self.load_winds_button = customtkinter.CTkButton(
+            self.winds_frame,
+            text="Load Winds of Fortune Files",
+            command=self.load_wind_files
+        )
+        self.load_winds_button.grid(row=3, column=0, columnspan=2, padx=10, pady=(10, 15), sticky="ew")
 
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
@@ -254,6 +303,45 @@ class App(customtkinter.CTk):
         except Exception as e:
             self.update_file_details(f"❌ Error parsing file:\n{e}")
 
+    def load_wind_files(self):
+        try:
+            # 1 Get filenames from dropdowns
+            sip_filename = self.file_selector.get()
+            template_filename = self.winds_template_selector.get()
+            winds_filename = self.winds_sip_selector.get()
+
+            if "No files found" in (template_filename, winds_filename):
+                tkinter.messagebox.showerror("File Error", "Please select valid template and winds SIP files.")
+                return
+
+            # 2  Build full file paths
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            data_dir = os.path.join(base_dir, "data")
+
+            sip_path = os.path.join(data_dir, sip_filename)
+            template_path = os.path.join(data_dir, template_filename)
+            winds_path = os.path.join(data_dir, winds_filename)
+
+            # 3 Create SIPParser instances
+            parser = SIPParser(sip_path)  # The main simulation file
+            template_parser = SIPParser(template_path)
+            winds_parser = SIPParser(winds_path)
+
+            # 4  Apply Winds of Fortune transformation
+            adjusted_groups = parser.apply_winds(
+                simulated_groups=parser.investments,
+                template_groups=template_parser.investments,
+                wind_groups=winds_parser.investments
+            )
+
+            # 5 Save the updated data for later visualization
+            self.current_investments = adjusted_groups
+            tkinter.messagebox.showinfo("Success", "Winds of Fortune applied successfully!")
+
+        except Exception as e:
+            tkinter.messagebox.showerror("Error", f"Failed to load files:\n{e}")
+
+
     def update_file_details(self, text):
         """Helper to update the File Details textbox"""
         self.file_details_textbox.configure(state="normal")
@@ -290,8 +378,16 @@ class App(customtkinter.CTk):
                 widget.destroy()
 
             # Get figure and tooltip manager from visualization module
+            # Check if Winds of Fortune is enabled and loaded
+            use_winds = hasattr(self, "toggle_winds_of_fortune") and self.toggle_winds_of_fortune.get()
+
+            if use_winds and hasattr(self, "wind_mappings") and hasattr(self, "wind_sip_values"):
+                self.load_wind_files()
+            else:
+                data_to_use = self.current_investments
+
             fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
-                self.current_investments, count, self.portfolio_info_text
+                data_to_use, count, self.portfolio_info_text
             )
 
             self._frontier_line = frontier_line
