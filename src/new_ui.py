@@ -34,7 +34,7 @@ class App(customtkinter.CTk):
 
         # create sidebar frame with widgets
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame.grid(row=0, column=0, rowspan=5, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
         # logo
         self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="| Navigation Menu |",
@@ -154,6 +154,14 @@ class App(customtkinter.CTk):
             state="disabled"
         )
         self.portfolio_info_text.grid(row=2, column=0, padx=(10, 10), pady=(0, 10), sticky='nesw')
+
+        # add button to export all portfolio info to CSV
+        self.export_button = customtkinter.CTkButton(
+            self.portfolio_info_frame,
+            text="Export Portfolio Info to CSV",
+            command=self.export_current_portfolios
+        )
+        self.export_button.grid(row=2, column=0, padx=(5, 5), pady=(0, 5), sticky='s')
 
         # create textbox (hidden by default)
         self.help_textbox = customtkinter.CTkTextbox(self, width=250, wrap="word")
@@ -484,6 +492,41 @@ class App(customtkinter.CTk):
         self.help_textbox.grid()  # re-add text
 
         self.current_frame = "help"
+
+    def export_current_portfolios(self):
+        """
+        Export the currently visualized portfolios to a CSV file.
+        Prompts user for filename, then saves
+        :return:
+        """
+        if not hasattr(self, "_last_sample_ports"):
+            tkinter.messagebox.showerror("Error", "No portfolios to export.")
+            return
+
+        # ask user for filename
+        dialog = customtkinter.CTkInputDialog(
+            title="Export Portfolios",
+            text="Enter filename for the CSV (without extension):"
+        )
+        filename = dialog.get_input()
+        if not filename:
+            tkinter.messagebox.showwarning("Cancelled", "Export cancelled - no filename specified.")
+            return
+
+        # build full path
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        export_path = os.path.join(base_dir, "data", f"{filename}.csv")
+
+        success = visualization.export_portfolios_to_csv(
+            export_path,
+            self._last_sample_ports,
+            self._last_eff_pts
+        )
+
+        if success:
+            tkinter.messagebox.showinfo("Success", f"Portfolios exported to {export_path}")
+        else:
+            tkinter.messagebox.showerror("Error", "Failed to export portfolios.")
 
 
 if __name__ == "__main__":

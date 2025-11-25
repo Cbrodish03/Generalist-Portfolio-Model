@@ -1,3 +1,5 @@
+import csv
+
 import matplotlib.pyplot as plt
 import numpy as np
 import variance_calcs as vc
@@ -318,6 +320,72 @@ def test_winds_plot():
     # group_data = adjusted_sips
     count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
     visualize_portfolios(adjusted_sips, count=count, plot=True)
+
+def export_portfolios_to_csv(filepath, random_ports, eff_ports):
+    """
+    Exports random and efficient portfolios to CSV file
+    Rows formatted as:
+        Portfolio Type, Average Return, Variance, Standard Dev, Weight 1, Weight 2, ..., Weight N
+    :param filepath:
+    :param random_ports:
+    :param eff_ports:
+    :return:
+    """
+    try:
+        with open(filepath, 'w', newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            # Write header
+            max_weights = 0
+            if random_ports:
+                max_weights = max(max_weights, len(random_ports[0]['weights']))
+            if eff_ports:
+                max_weights = max(max_weights, len(eff_ports[0]['weights']))
+
+            weight_headers = [f"Weight {i+1}" for i in range(max_weights)]
+
+            writer.writerow([
+                "Portfolio Type",
+                "Index",
+                "Average Return",
+                "Variance",
+                "Standard Deviation",
+                *weight_headers
+            ])
+
+            # Write random portfolios
+            for i, port in enumerate(random_ports):
+                meta = port['metadata']
+                weights = port['weights']
+                row = [
+                    "Random",
+                    i + 1,
+                    meta['AverageReturn'],
+                    meta['Variance'],
+                    np.sqrt(meta['Variance']),
+                    *weights
+                ]
+                writer.writerow(row)
+
+            # Write efficient portfolios
+            for i, port in enumerate(eff_ports):
+                meta = port['metadata']
+                weights = port['weights']
+                row = [
+                    "Efficient",
+                    i + 1,
+                    meta['AverageReturn'],
+                    meta['Variance'],
+                    np.sqrt(meta['Variance']),
+                    *weights
+                ]
+                writer.writerow(row)
+
+        return True
+
+    except Exception as e:
+        print(f"Error opening file {filepath} for writing: {e}")
+        return False
+
 
 
 if __name__ == "__main__":
