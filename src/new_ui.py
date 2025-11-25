@@ -467,6 +467,7 @@ class App(customtkinter.CTk):
         self.settings_frame.grid()  # re-add settings for portfolio generation
         self.parse_frame.grid()  # re-add parsing information
         self.portfolio_info_frame.grid()  # re-add portfolio frame
+        self.winds_frame.grid()  # re-add winds of fortune frame
 
         self.current_frame = "home"
 
@@ -478,6 +479,7 @@ class App(customtkinter.CTk):
         self.settings_frame.grid_remove()  # remove settings
         self.parse_frame.grid_remove()  # remove parsing information
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
+        self.winds_frame.grid_remove()  # remove winds of fortune frame
         self.about_textbox.grid()  # re-add about text
 
         self.current_frame = "about"
@@ -489,6 +491,7 @@ class App(customtkinter.CTk):
         self.parse_frame.grid_remove()  # remove parsing information
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
         self.about_textbox.grid_remove()  # remove about text
+        self.winds_frame.grid_remove()  # remove winds of fortune frame
         self.help_textbox.grid()  # re-add text
 
         self.current_frame = "help"
