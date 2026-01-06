@@ -1,4 +1,6 @@
 import csv
+import hashlib
+import json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -222,17 +224,24 @@ def plot_frontier(group_data):
     return xs, ys, eff_points
 
 
-def visualize_portfolios(group_data, count, info_textbox=None, plot=False):
+def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=None, show_frontier=True):
     """
-    Generates random portfolios and plots them with efficient frontier
-    :param group_data: samples to generate with
+    Generates random portfolios and plots them with efficient frontier.
+
+    :param group_data: SIP trial data used to generate portfolios
     :param count: number of random portfolios to generate
+    :param info_textbox: optional CustomTkinter textbox for displaying portfolio info
+    :param plot: if True, displays plot immediately (for standalone testing)
+    :param seed: optional integer seed for reproducible random generation
+    :param show_frontier: initial visibility state for efficient frontier elements
+    :return: (figure, TooltipManager, sample_ports, effpts, frontier_line, eff_scatter)
     """
-    gen = RandomPortfolios()
+    gen = RandomPortfolios(seed=seed)
     sample_ports = gen.generate_sample(group_data, count=count)
 
-    rx, ry = plot_rand(sample_ports)
+    # Always generate efficient frontier data
     ex, ey, effpts = plot_frontier(group_data)
+    rx, ry = plot_rand(sample_ports)
 
     asset_names = [item['metadata']['Name'] for item in group_data]
 
@@ -240,14 +249,23 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False):
     tm = TooltipManager(ax, info_textbox)
     tm.asset_names = asset_names
 
+    # Plot random portfolios (always visible)
     random_scatter = tm.add_scatter(rx, ry, c='b', s=15, picker=True, pickradius=5)
+
+    # Plot efficient portfolios (visibility controlled by show_frontier parameter)
     eff_scatter = tm.add_scatter(ex, ey, c='r', marker='*', picker=True, pickradius=5)
+    eff_scatter.set_visible(show_frontier)
+
+    # Plot frontier line (visibility controlled by show_frontier parameter)
+    # CRITICAL: ax.plot() returns a list; unpack to get the Line2D object
+    frontier_line, = ax.plot(ex, ey, c='r', ls='--', visible=show_frontier)
+
+    # Store portfolio data for tooltip system
     tm.randpts = sample_ports
     tm.effpts = effpts
 
-    # Store references for toggling
+    # Store references for external toggling (UI needs these)
     tm.eff_scatter = eff_scatter
-    frontier_line, = ax.plot(ex, ey, c='r', ls='--', visible=True)
     tm.frontier_line = frontier_line
 
     ax.set_xlabel("Risk (Std Dev)")
@@ -255,11 +273,6 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False):
     ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
     ax.grid(ls="--")
 
-    # plt.xlabel("Risk (Std Dev)")
-    # plt.ylabel("Average Return ($)")
-    # plt.title(f"Random portfolios ({count} samples) & Efficient Frontier")
-    # plt.grid(ls="--")
-    # plt.show()   # swap to returning the figure for integration with UI
     if plot:
         plt.show()
 
@@ -386,13 +399,96 @@ def export_portfolios_to_csv(filepath, random_ports, eff_ports):
         print(f"Error opening file {filepath} for writing: {e}")
         return False
 
+def test_seeded_randomness():
+    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
+    data = SLURP.investments
+
+    SEED = 5        # seed for RNG
+    COUNT = 20      # number of random portfolios to generate
+
+    def fingerprint(portfolios):
+        """Create a footprint of portfolio weights"""
+        payload = [
+            [round(w, 10) for w in p['weights']]
+            for p in portfolios
+        ]
+        blob = json.dumps(payload, sort_keys=True).encode()
+        return hashlib.sha256(blob).hexdigest()
+
+    gen1 = RandomPortfolios(seed=SEED)
+    ports1 = gen1.generate_sample(data, count=COUNT)
+
+    gen2 = RandomPortfolios(seed=SEED)
+    ports2 = gen2.generate_sample(data, count=COUNT)
+
+    fp1 = fingerprint(ports1)
+    fp2 = fingerprint(ports2)
+
+    print("Fingerprint 1:", fp1)
+    print("Fingerprint 2:", fp2)
+    print("Match:", fp1 == fp2)
+
+    # visual sanity check
+    visualize_portfolios(data, count=COUNT, plot=True, seed=SEED, show_frontier=False)
+
+# Test 1: Same seed produces identical results
+def test_determinism():
+    from parser import SIPParser
+
+    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
+    data = SLURP.investments
+
+    SEED = 42
+    COUNT = 100
+
+    # Run 1
+    gen1 = RandomPortfolios(seed=SEED)
+    ports1 = gen1.generate_sample(data, count=COUNT)
+
+    # Run 2
+    gen2 = RandomPortfolios(seed=SEED)
+    ports2 = gen2.generate_sample(data, count=COUNT)
+
+    # Verify identical weights
+    for i in range(COUNT):
+        assert np.allclose(ports1[i]['weights'], ports2[i]['weights'], rtol=1e-12)
+        assert np.allclose(ports1[i]['trials'], ports2[i]['trials'], rtol=1e-12)
+
+    print("✓ Determinism verified: Identical inputs produce identical outputs")
+
+# Test 2: Different seeds produce different results
+def test_seed_variation():
+    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
+    data = SLURP.investments
+
+    gen1 = RandomPortfolios(seed=1)
+    ports1 = gen1.generate_sample(data, count=50)
+
+    gen2 = RandomPortfolios(seed=2)
+    ports2 = gen2.generate_sample(data, count=50)
+
+    # Verify different weights
+    different = False
+    for i in range(50):
+        if not np.allclose(ports1[i]['weights'], ports2[i]['weights']):
+            different = True
+            break
+
+    assert different, "Different seeds should produce different results"
+    print("✓ Seed variation verified: Different seeds produce different outputs")
 
 
 if __name__ == "__main__":
     # SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    # # SLURP = SIPParser("data/small_SIP.xlsx")
+    # SLURP = SIPParser("data/small_SIP.xlsx")
     # group_data = SLURP.investments
     # count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
-    # visualize_portfolios(group_data, count=count, plot=True)
+    # seed = int(input("Enter an integer seed for RNG (or 0 for random): "))
+    # if seed == 0:
+    #     seed = None
+    # visualize_portfolios(group_data, count=count, plot=True, seed=seed)
     # pareto_plot(group_data, count=count)
-    test_winds_plot()
+    # test_winds_plot()
+    # test_seeded_randomness()
+    test_determinism()
+    test_seed_variation()

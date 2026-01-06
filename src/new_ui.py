@@ -257,6 +257,22 @@ class App(customtkinter.CTk):
         )
         self.visualize_button.grid(row=0, column=2, padx=(5, 0), pady=0, sticky="e")
 
+        # Seed label - ROW 1
+        self.seed_label = customtkinter.CTkLabel(
+            self.parse_frame,
+            text="🎲 Random Seed:",
+            anchor="center"
+        )
+        self.seed_label.grid(row=1, column=0, padx=(0, 5), pady=(0, 0), sticky="ew")
+
+        # Seed entry box - ROW 1
+        self.seed_entry = customtkinter.CTkEntry(
+            self.parse_frame,
+            placeholder_text="Optional Seed (leave blank for random)",
+            width=200
+        )
+        self.seed_entry.grid(row=1, column=1, columnspan=2, padx=(5, 0), pady=(5, 0), sticky="ew")
+
         # set default values
         self.appearance_mode_optionemenu.set("Dark")
         self.scaling_optionemenu.set("100%")
@@ -381,6 +397,19 @@ class App(customtkinter.CTk):
                 tkinter.messagebox.showerror("Invalid Input", "Please enter a number between 1 and 1000.")
                 return
 
+            # Get seed value (None if empty or invalid)
+            seed = None
+            seed_text = self.seed_entry.get().strip()
+            if seed_text:
+                try:
+                    seed = int(seed_text)
+                except ValueError:
+                    tkinter.messagebox.showerror("Invalid Seed", "Seed must be an integer. Using random seed instead.")
+                    return
+
+            # Get initial frontier visibility state from checkbox
+            show_frontier = self.toggle_efficient_frontier.get()
+
             # Clear old plot if it exists
             for widget in self.graph_frame.winfo_children():
                 widget.destroy()
@@ -395,7 +424,7 @@ class App(customtkinter.CTk):
                 data_to_use = self.current_investments
 
             fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
-                data_to_use, count, self.portfolio_info_text
+                data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
             )
 
             self._frontier_line = frontier_line
@@ -432,9 +461,14 @@ class App(customtkinter.CTk):
             self._last_tooltip_manager = tm
             self._last_sample_ports = sample_ports
             self._last_eff_pts = effpts
+            self._last_seed = seed  # store seed used
 
             # Switch to graph tab
             self.tabview.set("Graph")
+
+            # show confirmation message if seed was used
+            if seed is not None:
+                tkinter.messagebox.showinfo("Visualization Complete", f"Visualization complete using seed {seed}.")
 
         except ValueError:
             tkinter.messagebox.showerror("Invalid Input", "Please enter a valid integer.")
