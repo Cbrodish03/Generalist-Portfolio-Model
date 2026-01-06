@@ -9,22 +9,26 @@ class Portfolio:
    
    # TODO: add function to turn SIPs on/off BEFORE portfolio building/calcs
    # Will probably need to edit input from parser separately
-   def construct_port(self, source, type='c', mu_p=None):
+   def construct_port(self, source, type='c', mu_p=None, rng=None):
       """
       Creates an individual Portfolio object using SIP data
       :param source: SIP trial data used to construct portfolio
       :param type: can select custom, random, or Markowitz-efficient weights
       :return self.port: returns singular Portfolio object with desired asset weights
       """
+      port = {}
+
       if type == 'c':
-         self.port['weights'] = self.cust_weights(source)
+         port['weights'] = self.cust_weights(source)
          port_type = 'cust'
       elif type == 'r':
-         self.port['weights'] = self.rand_weights(source)
+         if rng is None:
+            raise ValueError("RNG must be provided for random portfolio generation.")
+         port['weights'] = self.rand_weights(source, rng=rng)
          port_type = 'rand'
       elif type == 'e':
          # TODO: add weights calculation for Pareto-efficient port using 10% OM
-         self.port['weights'] = self.eff_weights(source, mu_p)
+         port['weights'] = self.eff_weights(source, mu_p)
          port_type = 'eff'
       else:
          raise ValueError("Invalid portfolio type.")
@@ -38,20 +42,20 @@ class Portfolio:
    
       # Recalculates expected revenue & trial data for random portfolio as a weighted combination of asset data
       for i in range(count):
-         expected_rev += source[i]['metadata']['ExpectedRevenue'] * self.port['weights'][i]
+         expected_rev += source[i]['metadata']['ExpectedRevenue'] * port['weights'][i]
 
          # Converts 'assets' to NumPy array (because the calculations don't work otherwise :/ )
          old_trials = np.array(source[i]['trials'], dtype='f')
 
          for j in range(num_trials):
-            new_trials[j] += old_trials[j] * self.port['weights'][i]
+            new_trials[j] += old_trials[j] * port['weights'][i]
       
       # Split the avg_return & variance calculations into two processes since it kept throwing a runtime error :/
       mean = np.mean(new_trials)
       var = np.var(new_trials)
       percentile = np.percentile(new_trials, 10)      # TODO: make user-defined!
          
-      self.port['metadata'] = {
+      port['metadata'] = {
          'PortType': port_type,
          'ExpectedRevenue': expected_rev,
          'AverageReturn': mean * expected_rev,
@@ -60,9 +64,9 @@ class Portfolio:
          'IsParetoEff': False
       }
 
-      self.port['trials'] = new_trials
+      port['trials'] = new_trials
 
-      return self.port
+      return port
    
    def cust_weights(self, source):
       """
@@ -99,17 +103,21 @@ class Portfolio:
       return weights
 
    
-   def rand_weights(self, source):
+   def rand_weights(self, source, rng):
       """
       Generates Dirichlet-random asset weights for portfolio object
       :param source: SIP trial data
+      :param rng: random number generator instance
       :return weights: array of size count random asset weights
       """
       
       # TODO: give users more control over alpha values => control "degree of randomness"
       count = len(source)
-      alphas = np.random.rand(count) + np.random.randint(100, size=count)
-      weights = np.random.dirichlet(alphas)
+
+      # Generate alpha parameters: uniform [0, 1) + integer [0, 100)
+      alphas = rng.random(count) + rng.integers(100, size=count)
+      # alphas = np.random.rand(count) + np.random.randint(100, size=count)
+      weights = rng.dirichlet(alphas)
 
       return weights
 
@@ -138,7 +146,10 @@ class Portfolio:
 
       # Solve quadratic program
       prob = cp.Problem(objective, constraints)
-      prob.solve(solver=cp.SCS)
+      prob.solve(
+         solver=cp.SCS, # deterministic solver for QP
+         warm_start=False
+      )
 
       if w.value is None:
          raise ValueError("No feasible solution found for given target return.")

@@ -7,8 +7,15 @@ Dirichlet-random portfolio generator built for Generalist-Portfolio-Model
 Works with SIP Standard 2.0-compliant files
 """
 class RandomPortfolios:
-   def __init__(self):
+   def __init__(self, seed: int | None = None):
+      """
+      Owns the RNG used for all random portfolio generation
+      If seed is None, behavior is non-deterministic
+      :param seed: the seed for the random number generator
+      """
       self.sample_ports = []
+      self.seed = seed
+      self.rng = np.random.default_rng(seed)
 
    def generate_sample(self, source, count=10):
       """
@@ -17,11 +24,13 @@ class RandomPortfolios:
       :param count: number of random portfolios to generate
       :return self.sample_ports: fully initialized instance of RandomPortfolios class
       """
-      
+
+      self.sample_ports = [] # reset sample ports for repeatable calls
+
       # Fill array with random ports
       for i in range(count):
          port = Portfolio()
-         rand = port.construct_port(source, 'r')
+         rand = port.construct_port(source, 'r', rng=self.rng)
          self.sample_ports.append(rand)
       
       # Evaluate which random ports are Pareto efficient
