@@ -22,6 +22,11 @@ class App(customtkinter.CTk):
 
         self.current_frame = 'home'
 
+        # Investment data storage - ENHANCED FOR WINDS TOGGLE
+        self.original_investments = None      # Original parsed data (immutable)
+        self.winds_adjusted_investments = None  # Winds-adjusted data (created on-demand)
+        self.winds_loaded = False             # Flag indicating winds files are loaded
+
         # wind information
         self.sip_file = None                # path to main SIP file
         self.winds_template_file = None     # path to template file
@@ -47,7 +52,7 @@ class App(customtkinter.CTk):
         self.sidebar_button_about = customtkinter.CTkButton(self.sidebar_frame, text="🔎 About Me",
                                                             command=self.about_button_event)
         self.sidebar_button_about.grid(row=2, column=0, padx=20, pady=10)
-        self.sidebar_button_help = customtkinter.CTkButton(self.sidebar_frame, text="❔ Help",
+        self.sidebar_button_help = customtkinter.CTkButton(self.sidebar_frame, text="❓ Help",
                                                            command=self.help_button_event)
         self.sidebar_button_help.grid(row=3, column=0, padx=20, pady=10)
         # appearance menu
@@ -65,16 +70,13 @@ class App(customtkinter.CTk):
                                                                command=self.change_scaling_event)
         self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
 
-        # settings frame
-        self.settings_frame = customtkinter.CTkFrame(self)
+        # settings frame - MODIFIED TO BE SCROLLABLE
+        self.settings_frame = customtkinter.CTkScrollableFrame(self, label_text="Portfolio Options",
+                                                               label_font=("Segoe UI", 16, "bold"))
         self.settings_frame.grid(row=0, column=2, padx=(10, 10), pady=(38, 5), sticky="nsew")
-        self.settings_frame.grid_columnconfigure(2, weight=1)
+        self.settings_frame.grid_columnconfigure(0, weight=1)
 
-        settings_label = customtkinter.CTkLabel(self.settings_frame, text="Portfolio Customization Options",
-                                                font=("Segoe UI", 16, "bold"))
-        settings_label.pack(pady=(5, 5))
-
-        # Togglable features (no functionality yet)
+        # Toggleable features (now in scrollable frame)
         self.toggle_negative_weights = customtkinter.CTkCheckBox(self.settings_frame,
                                                                  text="Allow Negative Weights (Short Selling)")
         self.toggle_investment_tethering = customtkinter.CTkCheckBox(self.settings_frame,
@@ -85,53 +87,16 @@ class App(customtkinter.CTk):
                                                                    text="Toggle Efficient Frontier",
                                                                    command=self.toggle_frontier)
 
-        self.toggle_negative_weights.pack(anchor="w", pady=3)
-        self.toggle_investment_tethering.pack(anchor="w", pady=3)
-        self.toggle_high_risk_mode.pack(anchor="w", pady=3)
-        self.toggle_efficient_frontier.pack(anchor="w", pady=3)
+        self.toggle_negative_weights.pack(anchor="w", pady=3, padx=5)
+        self.toggle_investment_tethering.pack(anchor="w", pady=3, padx=5)
+        self.toggle_high_risk_mode.pack(anchor="w", pady=3, padx=5)
+        self.toggle_efficient_frontier.pack(anchor="w", pady=3, padx=5)
         self.toggle_efficient_frontier.select()
         self.toggle_winds_of_fortune = customtkinter.CTkCheckBox(
             self.settings_frame,
             text="Use Winds of Fortune"
         )
-        self.toggle_winds_of_fortune.pack(anchor="w", pady=3)
-
-        # Winds of Fortune Configuration Section
-        self.winds_frame = customtkinter.CTkFrame(self)
-        self.winds_frame.grid(row=4, column=1, padx=(20, 0), pady=(0, 20), sticky="ew")
-
-        winds_label = customtkinter.CTkLabel(
-            self.winds_frame,
-            text="🌪 Winds of Fortune Configuration",
-            font=("Segoe UI", 15, "bold")
-        )
-        winds_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
-
-        # Winds Template File selector
-        self.winds_template_label = customtkinter.CTkLabel(self.winds_frame, text="Template File:")
-        self.winds_template_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-
-        self.winds_template_selector = customtkinter.CTkOptionMenu(
-            self.winds_frame, values=self.get_data_files()
-        )
-        self.winds_template_selector.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
-
-        # Winds SIP File selector
-        self.winds_sip_label = customtkinter.CTkLabel(self.winds_frame, text="Winds SIP File:")
-        self.winds_sip_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
-
-        self.winds_sip_selector = customtkinter.CTkOptionMenu(
-            self.winds_frame, values=self.get_data_files()
-        )
-        self.winds_sip_selector.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
-
-        # Apply Winds Button
-        self.load_winds_button = customtkinter.CTkButton(
-            self.winds_frame,
-            text="Load Winds of Fortune Files",
-            command=self.load_wind_files
-        )
-        self.load_winds_button.grid(row=3, column=0, columnspan=2, padx=10, pady=(10, 15), sticky="ew")
+        self.toggle_winds_of_fortune.pack(anchor="w", pady=3, padx=5)
 
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
@@ -172,8 +137,17 @@ class App(customtkinter.CTk):
                                  "/data folder. Files are automatically scanned from this folder!\n\n" +
                                  "2. Once your file is selected from the dropdown menu, click parse to load the file "
                                  "and its content into the system.\n\n" +
-                                 "3. Enter the number of samples (e.g. 250) and click 'Visualize'.\n\n" +
-                                 "4. View the efficient frontier and portfolio data in the 'Graph' tab.\n\n" +
+                                 "3. Enter the number of samples (e.g. 250) and optionally a random seed for "
+                                 "reproducibility.\n\n" +
+                                 "4. Click 'Visualize' to generate portfolios.\n\n" +
+                                 "5. View the efficient frontier and portfolio data in the 'Graph' tab.\n\n" +
+                                 "--- Random Seed ---\n"
+                                 "The random seed controls the randomness in portfolio generation. Using the same seed "
+                                 "will produce identical results, which is useful for:\n"
+                                 "  • Reproducible analysis\n"
+                                 "  • Comparing different parameter settings\n"
+                                 "  • Debugging and validation\n\n"
+                                 "Leave the seed field empty for different results each time.\n\n"
                                  "--- Frequently Asked Questions ---\n" +
                                  "NOTE: This section is a WIP.\n\n")
 
@@ -208,7 +182,7 @@ class App(customtkinter.CTk):
 
         # create tabview (visible by default)
         self.tabview = customtkinter.CTkTabview(self, width=250)
-        self.tabview.grid(row=0, column=1, rowspan=2, padx=(20, 0), pady=(20, 10), sticky="nsew")
+        self.tabview.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 10), sticky="nsew")
         self.tabview.add("File Details")
         self.tabview.tab("File Details").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
         self.tabview.tab("File Details").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
@@ -229,49 +203,92 @@ class App(customtkinter.CTk):
         self.file_details_textbox.insert("0.0", "No file selected.")
         self.file_details_textbox.configure(state="disabled")  # read-only
 
-        # file selector underneath tabview
-        self.file_selector = customtkinter.CTkOptionMenu(self, values=self.get_data_files())
-        self.file_selector.grid(row=2, column=1, padx=(20, 0), pady=(0, 5), sticky="ew")
-
+        # parsing frame
         self.parse_frame = customtkinter.CTkFrame(self)
-        self.parse_frame.grid(row=3, column=1, padx=(20, 0), pady=(0, 20), sticky="ew")
-        self.parse_frame.grid_columnconfigure(0, weight=1)  # Parse button expands
+        self.parse_frame.grid(row=3, column=1, padx=(20, 0), pady=(0, 20), sticky="nsew")
+        self.parse_frame.grid_columnconfigure(0, weight=1)  # File selector expands
         self.parse_frame.grid_columnconfigure(1, weight=0)  # Entry fixed
         self.parse_frame.grid_columnconfigure(2, weight=0)  # Visualize button fixed
 
-        # Parse button inside frame
+        # File selector in parse frame - ROW 0 (MOVED FROM OUTSIDE)
+        self.file_selector = customtkinter.CTkOptionMenu(
+            self.parse_frame, values=self.get_data_files()
+        )
+        self.file_selector.grid(row=0, column=0, columnspan=3, pady=(0, 5), sticky="ew")
+
+        # Parse button inside frame - ROW 1 (was ROW 0)
         self.parse_button = customtkinter.CTkButton(
             self.parse_frame, text="Parse File", command=self.parse_selected_file
         )
-        self.parse_button.grid(row=0, column=0, padx=(0, 5), pady=0, sticky="ew")
+        self.parse_button.grid(row=1, column=0, padx=(0, 5), pady=(0, 5), sticky="ew")
 
-        # Entry box for sample count
+        # Entry box for sample count - ROW 1 (was ROW 0)
         self.sample_entry = customtkinter.CTkEntry(
             self.parse_frame, placeholder_text="Samples (1-1000)"
         )
-        self.sample_entry.grid(row=0, column=1, padx=(5, 5), pady=0, sticky="e")
+        self.sample_entry.grid(row=1, column=1, pady=(0, 5), sticky="ew")
 
-        # Visualize button
+        # Visualize button - ROW 1 (was ROW 0)
         self.visualize_button = customtkinter.CTkButton(
             self.parse_frame, text="Visualize", command=self.run_visualization
         )
-        self.visualize_button.grid(row=0, column=2, padx=(5, 0), pady=0, sticky="e")
+        self.visualize_button.grid(row=1, column=2, padx=(5, 0), pady=(0, 5), sticky="ew")
 
-        # Seed label - ROW 1
+        # Seed label - ROW 2 (was ROW 1)
         self.seed_label = customtkinter.CTkLabel(
             self.parse_frame,
             text="🎲 Random Seed:",
-            anchor="center"
+            anchor="w"
         )
-        self.seed_label.grid(row=1, column=0, padx=(0, 5), pady=(0, 0), sticky="ew")
+        self.seed_label.grid(row=2, column=0, padx=(0, 10), pady=(0, 0), sticky="")
 
-        # Seed entry box - ROW 1
+        # Seed entry box - ROW 2 (was ROW 1)
         self.seed_entry = customtkinter.CTkEntry(
             self.parse_frame,
-            placeholder_text="Optional Seed (leave blank for random)",
-            width=200
+            placeholder_text="Optional (leave blank for random)",
+            width=300
         )
-        self.seed_entry.grid(row=1, column=1, columnspan=2, padx=(5, 0), pady=(5, 0), sticky="ew")
+        self.seed_entry.grid(row=2, column=1, columnspan=2, padx=(0, 0), pady=(0, 0), sticky="ew")
+
+        # Winds of Fortune Configuration Section - SIDE-BY-SIDE COMPACT LAYOUT
+        self.winds_frame = customtkinter.CTkFrame(self)
+        self.winds_frame.grid(row=4, column=1, padx=(20, 0), pady=(0, 20), sticky="ew")
+        self.winds_frame.grid_columnconfigure((1, 3), weight=1)  # Make selectors expand equally
+
+        # Centered header label - ROW 0
+        winds_label = customtkinter.CTkLabel(
+            self.winds_frame,
+            text="🌪 Winds of Fortune Configuration",
+            font=("Segoe UI", 15, "bold")
+        )
+        winds_label.grid(row=0, column=0, columnspan=4, padx=10, pady=(10, 10), sticky="")  # Empty sticky = centered
+
+        # ROW 1: All components side-by-side
+        # Template File selector - LEFT SIDE
+        self.winds_template_label = customtkinter.CTkLabel(self.winds_frame, text="Template File:")
+        self.winds_template_label.grid(row=1, column=0, padx=(10, 5), pady=5, sticky="e")
+
+        self.winds_template_selector = customtkinter.CTkOptionMenu(
+            self.winds_frame, values=self.get_data_files()
+        )
+        self.winds_template_selector.grid(row=1, column=1, padx=(0, 15), pady=5, sticky="ew")
+
+        # Winds SIP File selector - RIGHT SIDE
+        self.winds_sip_label = customtkinter.CTkLabel(self.winds_frame, text="Winds SIP File:")
+        self.winds_sip_label.grid(row=1, column=2, padx=(15, 5), pady=5, sticky="e")
+
+        self.winds_sip_selector = customtkinter.CTkOptionMenu(
+            self.winds_frame, values=self.get_data_files()
+        )
+        self.winds_sip_selector.grid(row=1, column=3, padx=(0, 10), pady=5, sticky="ew")
+
+        # Load Winds Button - ROW 2
+        self.load_winds_button = customtkinter.CTkButton(
+            self.winds_frame,
+            text="Load Winds of Fortune Files",
+            command=self.load_wind_files
+        )
+        self.load_winds_button.grid(row=2, column=0, columnspan=4, padx=10, pady=(10, 15), sticky="ew")
 
         # set default values
         self.appearance_mode_optionemenu.set("Dark")
@@ -301,7 +318,11 @@ class App(customtkinter.CTk):
         try:
             parser = SIPParser(full_path)
             investments = parser.investments
-            self.current_investments = investments
+            self.original_investments = investments
+
+            # clear any previous loaded winds data (stale data protection)
+            self.winds_adjusted_investments = None
+            self.winds_loaded = False
 
             summary_text = f"📂 File: {filename}\n\nTotal investments: {len(investments)}\n"
             for idx, inv in enumerate(investments, start=1):
@@ -329,41 +350,59 @@ class App(customtkinter.CTk):
 
     def load_wind_files(self):
         try:
+            # 0 (Init) validate orignial data exists
+            if self.original_investments is None:
+                tkinter.messagebox.showerror(
+                    "No Data Error",
+                    "Please parse a SIP file before loading Winds of Fortune files")
+                return
+
             # 1 Get filenames from dropdowns
             sip_filename = self.file_selector.get()
             template_filename = self.winds_template_selector.get()
             winds_filename = self.winds_sip_selector.get()
 
             if "No files found" in (template_filename, winds_filename):
-                tkinter.messagebox.showerror("File Error", "Please select valid template and winds SIP files.")
+                tkinter.messagebox.showerror(
+                    "File Error",
+                    "Please select valid template and winds SIP files.")
                 return
 
             # 2  Build full file paths
             base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
             data_dir = os.path.join(base_dir, "data")
 
-            sip_path = os.path.join(data_dir, sip_filename)
             template_path = os.path.join(data_dir, template_filename)
             winds_path = os.path.join(data_dir, winds_filename)
 
             # 3 Create SIPParser instances
-            parser = SIPParser(sip_path)  # The main simulation file
             template_parser = SIPParser(template_path)
             winds_parser = SIPParser(winds_path)
 
+            sip_path = os.path.join(data_dir, sip_filename)
+            temp_parser = SIPParser(sip_path)  # The main simulation file
+
             # 4  Apply Winds of Fortune transformation
-            adjusted_groups = parser.apply_winds(
-                simulated_groups=parser.investments,
+            adjusted_groups = temp_parser.apply_winds(
+                simulated_groups=self.original_investments,     # use original data
                 template_groups=template_parser.investments,
                 wind_groups=winds_parser.investments
             )
 
-            # 5 Save the updated data for later visualization
-            self.current_investments = adjusted_groups
-            tkinter.messagebox.showinfo("Success", "Winds of Fortune applied successfully!")
+            # store data separately (to not overwrite original)
+            self.winds_adjusted_investments = adjusted_groups
+            self.winds_loaded = True
+
+            tkinter.messagebox.showinfo(
+                "Success",
+                "Winds of Fortune applied successfully!\n\n"
+                "Toggle 'Use Winds of Fortune' in customization options to enable/disable.")
 
         except Exception as e:
-            tkinter.messagebox.showerror("Error", f"Failed to load files:\n{e}")
+            tkinter.messagebox.showerror(
+                "Error",f"Failed to load files:\n{e}")
+            self.winds_adjusted_investments = None
+            self.winds_loaded = False
 
 
     def update_file_details(self, text):
@@ -390,7 +429,7 @@ class App(customtkinter.CTk):
         """Run visualization with the given sample count and show it in graph tab."""
         try:
             count = int(self.sample_entry.get())
-            if not hasattr(self, "current_investments"):
+            if self.original_investments is None:
                 tkinter.messagebox.showerror("Error", "Please parse a file first.")
                 return
             if not (1 <= count <= 1000):
@@ -410,18 +449,29 @@ class App(customtkinter.CTk):
             # Get initial frontier visibility state from checkbox
             show_frontier = self.toggle_efficient_frontier.get()
 
+            # select data source based on Winds of Fortune toggle
+            use_winds = self.toggle_winds_of_fortune.get()
+
+            if use_winds:
+                if not self.winds_loaded or self.winds_adjusted_investments is None:
+                    tkinter.messagebox.showerror(
+                        "Winds of Fortune Error",
+                        "Winds of Fortune files not loaded.\n\n"
+                        "Please load them before visualizing with this option enabled."
+                    )
+                    return
+                data_to_use = self.winds_adjusted_investments
+                print("Using Winds of Fortune adjusted data for visualization.")
+            else:
+                # user is requesting original data
+                data_to_use = self.original_investments
+                print("Using original investment data for visualization.")
+
             # Clear old plot if it exists
             for widget in self.graph_frame.winfo_children():
                 widget.destroy()
 
             # Get figure and tooltip manager from visualization module
-            # Check if Winds of Fortune is enabled and loaded
-            use_winds = hasattr(self, "toggle_winds_of_fortune") and self.toggle_winds_of_fortune.get()
-
-            if use_winds and hasattr(self, "wind_mappings") and hasattr(self, "wind_sip_values"):
-                self.load_wind_files()
-            else:
-                data_to_use = self.current_investments
 
             fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
                 data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
@@ -502,6 +552,7 @@ class App(customtkinter.CTk):
         self.parse_frame.grid()  # re-add parsing information
         self.portfolio_info_frame.grid()  # re-add portfolio frame
         self.winds_frame.grid()  # re-add winds of fortune frame
+        # self.console_frame.grid()  # re-add console log frame
 
         self.current_frame = "home"
 
@@ -514,6 +565,7 @@ class App(customtkinter.CTk):
         self.parse_frame.grid_remove()  # remove parsing information
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
         self.winds_frame.grid_remove()  # remove winds of fortune frame
+        # self.console_frame.grid_remove()  # remove console log frame
         self.about_textbox.grid()  # re-add about text
 
         self.current_frame = "about"
@@ -526,6 +578,7 @@ class App(customtkinter.CTk):
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
         self.about_textbox.grid_remove()  # remove about text
         self.winds_frame.grid_remove()  # remove winds of fortune frame
+        # self.console_frame.grid_remove()  # remove console log frame
         self.help_textbox.grid()  # re-add text
 
         self.current_frame = "help"
