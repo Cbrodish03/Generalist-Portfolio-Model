@@ -47,6 +47,7 @@ class TooltipManager:
         self.info_textbox.configure(state="normal")
         self.info_textbox.delete("1.0", "end")
         self.info_textbox.insert("end", text)
+        self.info_textbox.insert("end", "\n\n")
         self.info_textbox.configure(state="disabled")
 
     def toggle_efficient_frontier(self):

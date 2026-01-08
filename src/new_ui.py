@@ -39,7 +39,7 @@ class App(customtkinter.CTk):
 
         # create sidebar frame with widgets
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=5, sticky="nsew")
+        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
         # logo
         self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="| Navigation Menu |",
@@ -199,13 +199,13 @@ class App(customtkinter.CTk):
             self.tabview.tab("File Details"),
             wrap="word"
         )
-        self.file_details_textbox.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.file_details_textbox.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
         self.file_details_textbox.insert("0.0", "No file selected.")
         self.file_details_textbox.configure(state="disabled")  # read-only
 
         # parsing frame
         self.parse_frame = customtkinter.CTkFrame(self)
-        self.parse_frame.grid(row=3, column=1, padx=(20, 0), pady=(0, 20), sticky="nsew")
+        self.parse_frame.grid(row=3, column=1, padx=(20, 0), pady=(0, 10), sticky="nsew")
         self.parse_frame.grid_columnconfigure(0, weight=1)  # File selector expands
         self.parse_frame.grid_columnconfigure(1, weight=0)  # Entry fixed
         self.parse_frame.grid_columnconfigure(2, weight=0)  # Visualize button fixed
@@ -252,7 +252,7 @@ class App(customtkinter.CTk):
 
         # Winds of Fortune Configuration Section - SIDE-BY-SIDE COMPACT LAYOUT
         self.winds_frame = customtkinter.CTkFrame(self)
-        self.winds_frame.grid(row=4, column=1, padx=(20, 0), pady=(0, 20), sticky="ew")
+        self.winds_frame.grid(row=4, column=1, padx=(20, 0), pady=(0, 10), sticky="ew")
         self.winds_frame.grid_columnconfigure((1, 3), weight=1)  # Make selectors expand equally
 
         # Centered header label - ROW 0
@@ -289,6 +289,41 @@ class App(customtkinter.CTk):
             command=self.load_wind_files
         )
         self.load_winds_button.grid(row=2, column=0, columnspan=4, padx=10, pady=(10, 15), sticky="ew")
+
+        # Console log frame - NEW
+        self.console_frame = customtkinter.CTkFrame(self)
+        self.console_frame.grid(row=5, column=1, columnspan=2, padx=(20, 10), pady=(0, 20), sticky="ew")
+        self.console_frame.grid_rowconfigure(1, weight=1)
+        self.console_frame.grid_columnconfigure(0, weight=1)
+
+        # Console label
+        console_label = customtkinter.CTkLabel(
+            self.console_frame,
+            text="📟 Console Log",
+            font=("Segoe UI", 14, "bold"),
+            anchor="w"
+        )
+        console_label.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+
+        # Console textbox (read-only, scrollable)
+        self.console_textbox = customtkinter.CTkTextbox(
+            self.console_frame,
+            height=100,
+            wrap="word",
+            state="disabled",
+            font=("Consolas", 11)
+        )
+        self.console_textbox.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+
+        # Clear console button
+        self.clear_console_button = customtkinter.CTkButton(
+            self.console_frame,
+            text="Clear Console",
+            width=100,
+            height=24,
+            command=self.clear_console
+        )
+        self.clear_console_button.grid(row=0, column=1, padx=(5, 10), pady=(10, 5), sticky="e")
 
         # set default values
         self.appearance_mode_optionemenu.set("Dark")
@@ -344,6 +379,7 @@ class App(customtkinter.CTk):
 
             self.update_file_details(summary_text)
             self.tabview.set("File Details")
+            self.log_to_console(f"Successfully parsed file: {filename}", "SUCCESS")
 
         except Exception as e:
             self.update_file_details(f"❌ Error parsing file:\n{e}")
@@ -428,6 +464,10 @@ class App(customtkinter.CTk):
     def run_visualization(self):
         """Run visualization with the given sample count and show it in graph tab."""
         try:
+            self.log_to_console("Starting visualization...", "INFO")
+            import time
+            start_time = time.time()
+
             count = int(self.sample_entry.get())
             if self.original_investments is None:
                 tkinter.messagebox.showerror("Error", "Please parse a file first.")
@@ -461,11 +501,11 @@ class App(customtkinter.CTk):
                     )
                     return
                 data_to_use = self.winds_adjusted_investments
-                print("Using Winds of Fortune adjusted data for visualization.")
+                self.log_to_console("Using Winds of Fortune adjusted data for visualization.", "INFO")
             else:
                 # user is requesting original data
                 data_to_use = self.original_investments
-                print("Using original investment data for visualization.")
+                self.log_to_console("Using original investment data for visualization.", "INFO")
 
             # Clear old plot if it exists
             for widget in self.graph_frame.winfo_children():
@@ -512,22 +552,33 @@ class App(customtkinter.CTk):
             self._last_sample_ports = sample_ports
             self._last_eff_pts = effpts
             self._last_seed = seed  # store seed used
+            self._last_used_winds = use_winds  # store winds usage
 
             # Switch to graph tab
             self.tabview.set("Graph")
 
+            end_time = time.time()
+            duration = end_time - start_time
+            portfolios_per_second = count / duration if duration > 0 else 0
+
             # show confirmation message if seed was used
             if seed is not None:
-                tkinter.messagebox.showinfo("Visualization Complete", f"Visualization complete using seed {seed}.")
+                # tkinter.messagebox.showinfo("Visualization Complete", f"Visualization complete using seed {seed}.")
+                self.log_to_console(f"Visualization complete using requested seed {seed}", "SUCCESS")
+            else:
+                # tkinter.messagebox.showinfo("Visualization Complete", "Visualization complete with random seed.")
+                self.log_to_console(f"Visualization complete with random seed", "SUCCESS")
+
+            self.log_to_console(
+                f"Visualization completed: {count} portfolios in {duration:.2f} seconds "
+                f"({portfolios_per_second:.1f} portfolios/sec).",
+                "INFO"
+            )
 
         except ValueError:
             tkinter.messagebox.showerror("Invalid Input", "Please enter a valid integer.")
         except Exception as e:
             tkinter.messagebox.showerror("Visualization Error", f"An error occurred:\n{e}")
-
-    def open_input_dialog_event(self):
-        dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
-        print("CTkInputDialog:", dialog.get_input())
 
     def change_appearance_mode_event(self, new_appearance_mode: str):
         customtkinter.set_appearance_mode(new_appearance_mode)
@@ -543,7 +594,6 @@ class App(customtkinter.CTk):
             self.about_button_event()
 
     def home_button_event(self):
-        # print("sidebar_button click")
         self.help_textbox.grid_remove()  # remove help text
         self.about_textbox.grid_remove()  # remove about text
         self.tabview.grid()  # re-add tabs
@@ -552,12 +602,11 @@ class App(customtkinter.CTk):
         self.parse_frame.grid()  # re-add parsing information
         self.portfolio_info_frame.grid()  # re-add portfolio frame
         self.winds_frame.grid()  # re-add winds of fortune frame
-        # self.console_frame.grid()  # re-add console log frame
+        self.console_frame.grid()  # re-add console log frame
 
         self.current_frame = "home"
 
     def about_button_event(self):
-        # print("about_button click")
         self.tabview.grid_remove()  # remove tabs
         self.file_selector.grid_remove()  # remove file selector
         self.help_textbox.grid_remove()  # remove help text
@@ -565,7 +614,7 @@ class App(customtkinter.CTk):
         self.parse_frame.grid_remove()  # remove parsing information
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
         self.winds_frame.grid_remove()  # remove winds of fortune frame
-        # self.console_frame.grid_remove()  # remove console log frame
+        self.console_frame.grid_remove()  # remove console log frame
         self.about_textbox.grid()  # re-add about text
 
         self.current_frame = "about"
@@ -578,7 +627,7 @@ class App(customtkinter.CTk):
         self.portfolio_info_frame.grid_remove()  # remove portfolio frame
         self.about_textbox.grid_remove()  # remove about text
         self.winds_frame.grid_remove()  # remove winds of fortune frame
-        # self.console_frame.grid_remove()  # remove console log frame
+        self.console_frame.grid_remove()  # remove console log frame
         self.help_textbox.grid()  # re-add text
 
         self.current_frame = "help"
@@ -618,6 +667,42 @@ class App(customtkinter.CTk):
         else:
             tkinter.messagebox.showerror("Error", "Failed to export portfolios.")
 
+    def log_to_console(self, message, level="INFO"):
+        """
+        Routes messages to the console textbox with timestamp and level
+        :param message: Message text to display
+        :param level: Message level (INFO, SUCCESS, WARNING, ERROR)
+        :return:
+        """
+        import datetime
+        # enable write to textbox
+        self.console_textbox.configure(state="normal")
+        # format timestamp
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+
+        # color code based on level
+        level_colors = {
+            "INFO": "",     # default color
+            "SUCCESS": "✓",
+            "WARNING": "⚠",
+            "ERROR": "❌"
+        }
+        icon = level_colors.get(level.upper(), "")
+        formatted_message = f"[{timestamp}] {icon} {message}\n"
+
+        # #insert message
+        self.console_textbox.insert("end", formatted_message)
+        # auto-scroll to end
+        self.console_textbox.see("end")
+        # disable write to textbox
+        self.console_textbox.configure(state="disabled")
+
+    def clear_console(self):
+        """Clear all messages from the console"""
+        self.console_textbox.configure(state="normal")
+        self.console_textbox.delete("1.0", "end")
+        self.console_textbox.configure(state="disabled")
+        self.log_to_console("Console cleared.", "INFO")
 
 if __name__ == "__main__":
     app = App()
