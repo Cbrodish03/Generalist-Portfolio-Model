@@ -98,6 +98,37 @@ class App(customtkinter.CTk):
         )
         self.toggle_winds_of_fortune.pack(anchor="w", pady=3, padx=5)
 
+        # Axis scaling controls
+        customtkinter.CTkLabel(
+            self.settings_frame,
+            text="─── Graph Axis Scaling ───",
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(10, 5), padx=5)
+
+        self.toggle_fixed_axes = customtkinter.CTkCheckBox(
+            self.settings_frame,
+            text="Use Fixed Axis Scale"
+        )
+        self.toggle_fixed_axes.pack(anchor="w", pady=3, padx=5)
+
+        # Frame for axis limit inputs
+        axis_frame = customtkinter.CTkFrame(self.settings_frame)
+        axis_frame.pack(fill="x", pady=5, padx=5)
+
+        # X-axis limits
+        customtkinter.CTkLabel(axis_frame, text="X-axis (Risk):").grid(row=0, column=0, padx=5, pady=2, sticky="w")
+        self.x_min_entry = customtkinter.CTkEntry(axis_frame, placeholder_text="Min", width=80)
+        self.x_min_entry.grid(row=0, column=1, padx=2, pady=2)
+        self.x_max_entry = customtkinter.CTkEntry(axis_frame, placeholder_text="Max", width=80)
+        self.x_max_entry.grid(row=0, column=2, padx=2, pady=2)
+
+        # Y-axis limits
+        customtkinter.CTkLabel(axis_frame, text="Y-axis (Return):").grid(row=1, column=0, padx=5, pady=2, sticky="w")
+        self.y_min_entry = customtkinter.CTkEntry(axis_frame, placeholder_text="Min", width=80)
+        self.y_min_entry.grid(row=1, column=1, padx=2, pady=2)
+        self.y_max_entry = customtkinter.CTkEntry(axis_frame, placeholder_text="Max", width=80)
+        self.y_max_entry.grid(row=1, column=2, padx=2, pady=2)
+
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
         self.portfolio_info_frame.grid(row=1, column=2, rowspan=4, padx=(10, 10), pady=(5, 10), sticky="nesw")
@@ -181,7 +212,7 @@ class App(customtkinter.CTk):
         self.about_textbox.grid_remove()  # start hidden
 
         # create tabview (visible by default)
-        self.tabview = customtkinter.CTkTabview(self, width=250)
+        self.tabview = customtkinter.CTkTabview(self, width=100)
         self.tabview.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 10), sticky="nsew")
         self.tabview.add("File Details")
         self.tabview.tab("File Details").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
@@ -192,7 +223,7 @@ class App(customtkinter.CTk):
         self.tabview.tab("Graph").grid_rowconfigure(0, weight=1)  # configure grid of individual tabs
 
         self.graph_frame = customtkinter.CTkFrame(self.tabview.tab("Graph"))  # give dedicated tab for Matplotlib fig.
-        self.graph_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.graph_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
         # scrollable textbox inside File Details tab
         self.file_details_textbox = customtkinter.CTkTextbox(
@@ -485,6 +516,10 @@ class App(customtkinter.CTk):
                 except ValueError:
                     tkinter.messagebox.showerror("Invalid Seed", "Seed must be an integer. Using random seed instead.")
                     return
+            else:
+                import numpy as np
+                seed = np.random.randint(0, 2**31 - 1) # generate random seed for logging purposes
+            self.log_to_console(f"Generated random seed: {seed}", "INFO")
 
             # Get initial frontier visibility state from checkbox
             show_frontier = self.toggle_efficient_frontier.get()
@@ -511,11 +546,40 @@ class App(customtkinter.CTk):
             for widget in self.graph_frame.winfo_children():
                 widget.destroy()
 
+            # Get axis limits if fixed scaling is enabled
+            axis_limits = None
+            if self.toggle_fixed_axes.get():
+                try:
+                    x_min = float(self.x_min_entry.get()) if self.x_min_entry.get().strip() else None
+                    x_max = float(self.x_max_entry.get()) if self.x_max_entry.get().strip() else None
+                    y_min = float(self.y_min_entry.get()) if self.y_min_entry.get().strip() else None
+                    y_max = float(self.y_max_entry.get()) if self.y_max_entry.get().strip() else None
+
+                    axis_limits = {
+                        'x_min': x_min,
+                        'x_max': x_max,
+                        'y_min': y_min,
+                        'y_max': y_max
+                    }
+                    self.log_to_console("Using fixed axis scale", "INFO")
+                except ValueError:
+                    tkinter.messagebox.showerror("Invalid Input", "Axis limits must be numeric values.")
+                    self.log_to_console("Visualization failed: Invalid axis limits", "ERROR")
+                    return
+
             # Get figure and tooltip manager from visualization module
 
             fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
                 data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
             )
+
+            # Apply axis limits if specified
+            if axis_limits:
+                ax = fig.axes[0]
+                if axis_limits['x_min'] is not None or axis_limits['x_max'] is not None:
+                    ax.set_xlim(left=axis_limits['x_min'], right=axis_limits['x_max'])
+                if axis_limits['y_min'] is not None or axis_limits['y_max'] is not None:
+                    ax.set_ylim(bottom=axis_limits['y_min'], top=axis_limits['y_max'])
 
             self._frontier_line = frontier_line
             self._eff_scatter = eff_scatter
@@ -561,18 +625,12 @@ class App(customtkinter.CTk):
             duration = end_time - start_time
             portfolios_per_second = count / duration if duration > 0 else 0
 
-            # show confirmation message if seed was used
-            if seed is not None:
-                # tkinter.messagebox.showinfo("Visualization Complete", f"Visualization complete using seed {seed}.")
-                self.log_to_console(f"Visualization complete using requested seed {seed}", "SUCCESS")
-            else:
-                # tkinter.messagebox.showinfo("Visualization Complete", "Visualization complete with random seed.")
-                self.log_to_console(f"Visualization complete with random seed", "SUCCESS")
+            self.log_to_console(f"Seed used: {seed}", "INFO")
 
             self.log_to_console(
-                f"Visualization completed: {count} portfolios in {duration:.2f} seconds "
+                f"Visualization completed: {count} portfolios generated in {duration:.2f} seconds "
                 f"({portfolios_per_second:.1f} portfolios/sec).",
-                "INFO"
+                "SUCCESS"
             )
 
         except ValueError:
