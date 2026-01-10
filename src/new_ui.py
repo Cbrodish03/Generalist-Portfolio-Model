@@ -17,8 +17,8 @@ class App(customtkinter.CTk):
 
         # configure window
         self.title(" SIP Analyzer UI")
-        self.geometry(f"{1000}x{600}")
-        self.minsize(1000, 600)
+        self.geometry(f"{1300}x{800}")
+        self.minsize(1300, 800)
 
         self.current_frame = 'home'
 
@@ -26,6 +26,10 @@ class App(customtkinter.CTk):
         self.original_investments = None      # Original parsed data (immutable)
         self.winds_adjusted_investments = None  # Winds-adjusted data (created on-demand)
         self.winds_loaded = False             # Flag indicating winds files are loaded
+
+        # Visualization cache
+        self.visualization_cache = []       # List of (cache_key, cache_data) tuples
+        self.max_cache_size = 1             # Max number of cached visualizations (expandable)
 
         # wind information
         self.sip_file = None                # path to main SIP file
@@ -71,9 +75,9 @@ class App(customtkinter.CTk):
         self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
 
         # settings frame - MODIFIED TO BE SCROLLABLE
-        self.settings_frame = customtkinter.CTkScrollableFrame(self, label_text="Portfolio Options",
+        self.settings_frame = customtkinter.CTkScrollableFrame(self, label_text="Portfolio Settings",
                                                                label_font=("Segoe UI", 16, "bold"))
-        self.settings_frame.grid(row=0, column=2, padx=(10, 10), pady=(38, 5), sticky="nsew")
+        self.settings_frame.grid(row=0, column=2, rowspan=4, padx=(10, 10), pady=(38, 5), sticky="nsew")
         self.settings_frame.grid_columnconfigure(0, weight=1)
 
         # Toggleable features (now in scrollable frame)
@@ -129,9 +133,22 @@ class App(customtkinter.CTk):
         self.y_max_entry = customtkinter.CTkEntry(axis_frame, placeholder_text="Max", width=80)
         self.y_max_entry.grid(row=1, column=2, padx=2, pady=2)
 
+        # Cache size control
+        customtkinter.CTkLabel(
+            self.settings_frame,
+            text="─── Visualization Cache Size ───",
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(10, 5), padx=5)
+
+        self.cache_size_selector = customtkinter.CTkOptionMenu(
+            self.settings_frame,
+            values=["1", "2", "4", "5", "10"],
+            command=lambda v: setattr(self, 'max_cache_size', int(v))
+        ).pack(anchor="w", pady=3, padx=5)
+
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
-        self.portfolio_info_frame.grid(row=1, column=2, rowspan=4, padx=(10, 10), pady=(5, 10), sticky="nesw")
+        self.portfolio_info_frame.grid(row=4, column=2, rowspan=3, padx=(10, 10), pady=(5, 20), sticky="nesw")
         self.portfolio_info_frame.grid_rowconfigure(0, weight=0)
         self.portfolio_info_frame.grid_rowconfigure(2, weight=1)
         self.portfolio_info_frame.grid_columnconfigure(0, weight=1)
@@ -212,7 +229,7 @@ class App(customtkinter.CTk):
         self.about_textbox.grid_remove()  # start hidden
 
         # create tabview (visible by default)
-        self.tabview = customtkinter.CTkTabview(self, width=100)
+        self.tabview = customtkinter.CTkTabview(self)
         self.tabview.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 10), sticky="nsew")
         self.tabview.add("File Details")
         self.tabview.tab("File Details").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
@@ -323,7 +340,7 @@ class App(customtkinter.CTk):
 
         # Console log frame - NEW
         self.console_frame = customtkinter.CTkFrame(self)
-        self.console_frame.grid(row=5, column=1, columnspan=2, padx=(20, 10), pady=(0, 20), sticky="ew")
+        self.console_frame.grid(row=5, column=1, columnspan=1, padx=(20, 0), pady=(0, 20), sticky="ew")
         self.console_frame.grid_rowconfigure(1, weight=1)
         self.console_frame.grid_columnconfigure(0, weight=1)
 
@@ -544,7 +561,11 @@ class App(customtkinter.CTk):
 
             # Clear old plot if it exists
             for widget in self.graph_frame.winfo_children():
+                widget.pack_forget()    # unpack before destroying
                 widget.destroy()
+
+            # Force frame update to avoid embedding issues
+            self.graph_frame.update_idletasks()
 
             # Get axis limits if fixed scaling is enabled
             axis_limits = None
@@ -567,11 +588,38 @@ class App(customtkinter.CTk):
                     self.log_to_console("Visualization failed: Invalid axis limits", "ERROR")
                     return
 
-            # Get figure and tooltip manager from visualization module
+            # Cache Integration - check if we have a cached version
+            cache_key = self.generate_viz_cache_key(use_winds, count, seed, show_frontier, axis_limits)
+            cached = self.get_cached_visualization(cache_key)
 
-            fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
-                data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
-            )
+            if cached is not None:
+                # Cache hit - retrieve cached data
+                self.log_to_console("Using cached visualization data.", "INFO")
+                fig = cached['fig']
+                tm = cached['tm']
+                sample_ports = cached['sample_ports']
+                effpts = cached['eff_pts']
+                frontier_line = cached['frontier_line']
+                eff_scatter = cached['eff_scatter']
+                # fig.canvas = None  # detach old canvas to avoid conflicts
+            else:
+                # Cache miss - proceed to generate visualization normally
+                self.log_to_console("No cached data found. Generating new visualization...", "INFO")
+                fig, tm, sample_ports, effpts, frontier_line, eff_scatter = visualization.visualize_portfolios(
+                    data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
+                )
+
+                # Store in cache
+                cache_data = {
+                    'fig': fig,
+                    'tm' : tm,
+                    'sample_ports': sample_ports,
+                    'eff_pts': effpts,
+                    'frontier_line': frontier_line,
+                    'eff_scatter': eff_scatter
+                }
+                self.cache_visualization(cache_key, cache_data)
+                self.log_to_console("Visualization data cached for future use.", "INFO")
 
             # Apply axis limits if specified
             if axis_limits:
@@ -585,10 +633,13 @@ class App(customtkinter.CTk):
             self._eff_scatter = eff_scatter
 
             # Embed figure in the Tkinter tab
+            fig.tight_layout()      # adjust layout before embedding
             canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
             canvas.draw()
             widget = canvas.get_tk_widget()
             widget.pack(fill="both", expand=True)
+            widget.configure(width=1, height=1)  # allow resizing
+            self.graph_frame.update_idletasks()
 
             # add toolbar to graph
             toolbar = NavigationToolbar2Tk(canvas, self.graph_frame)
@@ -623,15 +674,21 @@ class App(customtkinter.CTk):
 
             end_time = time.time()
             duration = end_time - start_time
-            portfolios_per_second = count / duration if duration > 0 else 0
 
-            self.log_to_console(f"Seed used: {seed}", "INFO")
+            # Calculate generation speed if not cached
+            if cached is None:
+                portfolios_per_second = count / duration if duration > 0 else 0
+                self.log_to_console(f"Seed used: {seed}", "INFO")
 
-            self.log_to_console(
-                f"Visualization completed: {count} portfolios generated in {duration:.2f} seconds "
-                f"({portfolios_per_second:.1f} portfolios/sec).",
-                "SUCCESS"
-            )
+                self.log_to_console(
+                    f"Visualization completed: {count} portfolios generated in {duration:.2f} seconds "
+                    f"({portfolios_per_second:.1f} portfolios/sec).",
+                    "SUCCESS"
+                )
+            else:
+                # Cached - log retrieval time only
+                self.log_to_console(
+                    f"Visualization completed using cached data in {duration:.2f} seconds.","SUCCESS")
 
         except ValueError:
             tkinter.messagebox.showerror("Invalid Input", "Please enter a valid integer.")
@@ -741,9 +798,9 @@ class App(customtkinter.CTk):
         # color code based on level
         level_colors = {
             "INFO": "",     # default color
-            "SUCCESS": "✓",
-            "WARNING": "⚠",
-            "ERROR": "❌"
+            "SUCCESS": " ✓",
+            "WARNING": " ⚠",
+            "ERROR": " ❌"
         }
         icon = level_colors.get(level.upper(), "")
         formatted_message = f"[{timestamp}] {icon} {message}\n"
@@ -761,6 +818,62 @@ class App(customtkinter.CTk):
         self.console_textbox.delete("1.0", "end")
         self.console_textbox.configure(state="disabled")
         self.log_to_console("Console cleared.", "INFO")
+
+    def generate_viz_cache_key(self, use_winds, count, seed, show_frontier, axis_limits):
+        """
+        Generate a unique cache key for the visualization parameters.
+        :param use_winds: Whether Winds of Fortune is used
+        :param count: Number of portfolios
+        :param seed: Random seed
+        :param show_frontier: Whether to show efficient frontier
+        :param axis_limits: Axis limits dictionary
+        :return: String cache key
+        """
+        import hashlib
+        import json
+
+        cache_dict = {
+            'use_winds': use_winds,
+            'count': count,
+            'seed': seed,
+            'show_frontier': show_frontier,
+            'axis_limits': axis_limits
+        }
+
+        # convert to JSON string and hash for key
+        cache_str = json.dumps(cache_dict, sort_keys=True)
+        return hashlib.md5(cache_str.encode()).hexdigest()
+
+    def get_cached_visualization(self, cache_key):
+        """
+        Retrieve cached visualization if it exists.
+        :param cache_key: Cache key string
+        :return: Cached visualization data or None
+        """
+        for key, data in self.visualization_cache:
+            if key == cache_key:
+                return data
+        return None
+
+    def cache_visualization(self, cache_key, cache_data):
+        """
+        Cache the visualization data with LRU (Least Recently Used) eviction
+        :param cache_key: Cache key string
+        :param cache_data: Visualization data to cache
+        :return:
+        """
+
+        # remove if already exists (to front for LRU)
+        self.visualization_cache = [(k, d) for (k, d) in self.visualization_cache if k != cache_key]
+
+        # add to front of cache
+        self.visualization_cache.insert(0, (cache_key, cache_data))
+
+        # trim cache if exceeds max size (evicting the oldest entry)
+        if len(self.visualization_cache) > self.max_cache_size:
+            self.visualization_cache = self.visualization_cache[:self.max_cache_size]
+            self.log_to_console("Visualization cache full - evicting oldest entry.", "INFO")
+
 
 if __name__ == "__main__":
     app = App()
