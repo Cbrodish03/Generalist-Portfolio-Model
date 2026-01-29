@@ -186,13 +186,37 @@ class App(customtkinter.CTk):
         # portfolio information frame
         self.portfolio_info_frame = customtkinter.CTkFrame(self)
         self.portfolio_info_frame.grid(row=0, column=3, rowspan=4, padx=(10, 10), pady=(19, 0), sticky="nesw")
-        self.portfolio_info_frame.grid_rowconfigure(0, weight=0)
-        self.portfolio_info_frame.grid_rowconfigure(2, weight=1)
+        self.portfolio_info_frame.grid_rowconfigure(0, weight=0)    # label
+        self.portfolio_info_frame.grid_rowconfigure(1, weight=0)    # search frame
+        self.portfolio_info_frame.grid_rowconfigure(2, weight=0)    # spacer
+        self.portfolio_info_frame.grid_rowconfigure(3, weight=1)    # textbox + button
         self.portfolio_info_frame.grid_columnconfigure(0, weight=1)
         # portfolio info label
         portfolio_info_label = customtkinter.CTkLabel(self.portfolio_info_frame, text="Portfolio Information",
                                                       font=("Segoe UI", 16, "bold"))
-        portfolio_info_label.grid(rowspan=2, padx=(5, 5), pady=(5, 5), sticky='new')
+        portfolio_info_label.grid(row=0, column=0, padx=(5, 5), pady=(5, 5), sticky='new')
+
+        # Portfolio search frame
+        portfolio_search_frame = customtkinter.CTkFrame(self.portfolio_info_frame)
+        portfolio_search_frame.grid(row=1, column=0, padx=(10, 10), pady=(5, 5), sticky='ew')
+        portfolio_search_frame.grid_columnconfigure(0, weight=1)
+
+        # Search entry
+        self.portfolio_search_entry = customtkinter.CTkEntry(
+            portfolio_search_frame,
+            placeholder_text="Search Portfolio by ID (e.g., 5)"
+        )
+        self.portfolio_search_entry.grid(row=0, column=0, padx=(5, 5), pady=5, sticky='ew')
+        self.portfolio_search_entry.bind("<Return>", lambda e: self.search_portfolio())
+
+        # Search button
+        self.portfolio_search_button = customtkinter.CTkButton(
+            portfolio_search_frame,
+            text="🔍 Search",
+            command=self.search_portfolio,
+            width=80
+        )
+        self.portfolio_search_button.grid(row=0, column=1, padx=(0, 5), pady=5, sticky="e")
 
         self.portfolio_info_text = customtkinter.CTkTextbox(
             self.portfolio_info_frame,
@@ -201,11 +225,12 @@ class App(customtkinter.CTk):
         self.portfolio_info_text.insert(
             "0.0",
             "After running a visualization, click a portfolio to see its details here!\n\n"
+            "Alternatively, use the search box above to find a specific portfolio by its ID.\n\n"
             "Click the 'Export Portfolio Info to CSV' button below to save all generated portfolios "
             "in the current visualization"
         )
         self.portfolio_info_text.configure(state="disabled")  # read-only
-        self.portfolio_info_text.grid(row=2, column=0, padx=(10, 10), pady=(0, 10), sticky='nesw')
+        self.portfolio_info_text.grid(row=3, column=0, padx=(10, 10), pady=(0, 10), sticky='nesw')
 
         # Add button to export all portfolio info to CSV
         self.export_button = customtkinter.CTkButton(
@@ -213,7 +238,7 @@ class App(customtkinter.CTk):
             text="Export Portfolio Info to CSV",
             command=self.export_current_portfolios
         )
-        self.export_button.grid(row=2, column=0, padx=(5, 5), pady=(0, 5), sticky='s')
+        self.export_button.grid(row=3, column=0, padx=(5, 5), pady=(0, 5), sticky='s')
 
         # Create tabview (visible by default)
         self.tabview = customtkinter.CTkTabview(self)
@@ -244,14 +269,14 @@ class App(customtkinter.CTk):
         # ==============================================================
         self.control_tabview = customtkinter.CTkTabview(
             self,
-            height=100
+            height=160
         )
-        self.control_tabview.grid(row=4, column=1, rowspan=1, padx=(20, 0), pady=(0, 10), sticky="ew")
+        self.control_tabview.grid(row=4, column=1, padx=(20, 0), pady=(0, 10), sticky="nsew")
         self.control_tabview.add("File Configuration")
         self.control_tabview.add("Winds of Fortune")
 
         # Configure tab grids
-        self.control_tabview.tab("File Configuration").grid_columnconfigure(0, weight=1)
+        self.control_tabview.tab("File Configuration").grid_columnconfigure((1, 3), weight=1)
         self.control_tabview.tab("Winds of Fortune").grid_columnconfigure((1, 3), weight=1)
 
         # -----------------------------------------------------------------------------------------------
@@ -264,7 +289,7 @@ class App(customtkinter.CTk):
             file_tab,
             values=self.get_data_files()
         )
-        self.file_selector.grid(row=0, column=0, columnspan=3, pady=(0, 5), sticky="ew")
+        self.file_selector.grid(row=0, column=0, columnspan=4, pady=(0, 5), sticky="ew")
 
         # Parse button
         self.parse_button = customtkinter.CTkButton(
@@ -287,22 +312,22 @@ class App(customtkinter.CTk):
             text="Run Visualization",
             command=self.run_visualization
         )
-        self.visualize_button.grid(row=1, column=2, padx=(5, 0), pady=(0, 5), sticky="ew")
+        self.visualize_button.grid(row=1, column=2, columnspan=2, padx=(5, 0), pady=(0, 5), sticky="ew")
 
         # Seed label
         self.seed_label = customtkinter.CTkLabel(
             file_tab,
             text="🎲 Random Seed:",
-            anchor="w"
+            # anchor="w"
         )
-        self.seed_label.grid(row=2, column=0, padx=(0, 10), pady=(0, 0), sticky="")
+        self.seed_label.grid(row=2, column=0, padx=(0, 10), pady=(0, 0), sticky="ew")
 
         # Seed entry
         self.seed_entry = customtkinter.CTkEntry(
             file_tab,
             placeholder_text="Optional (leave blank for random)"
         )
-        self.seed_entry.grid(row=2, column=1, columnspan=2, padx=(0, 0), pady=(0, 0), sticky="ew")
+        self.seed_entry.grid(row=2, column=1, columnspan=3, padx=(0, 0), pady=(0, 0), sticky="ew")
 
         # ------------------------------------------------------------------------------------------------
         # WINDS OF FORTUNE TAB - Contains template file selector, winds SIP file selector, and load button
@@ -342,7 +367,6 @@ class App(customtkinter.CTk):
             winds_tab,
             text="Load Winds of Fortune Files",
             command=self.load_wind_files,
-            width=200
         )
         self.load_winds_button.grid(row=2, column=0, columnspan=4, padx=0, pady=(5, 0), sticky="ew")
 
@@ -443,6 +467,74 @@ class App(customtkinter.CTk):
         # set default values
         self.appearance_mode_optionemenu.set("Dark")
         self.scaling_optionemenu.set("100%")
+
+    def search_portfolio(self):
+        """
+        Search for and display a portfolio by its index number
+        Simulates clicking the portfolio on the graph
+        :return:
+        """
+        # Validate visualization exists
+        if not hasattr(self, "_last_sample_ports") or not hasattr(self, "_last_eff_pts"):
+            self.log_to_console("No portfolios available - run visualization first.", "WARNING")
+            return
+
+        # Get search input
+        search_text = self.portfolio_search_entry.get().strip()
+        if not search_text:
+            self.log_to_console("Search failed: No portfolio number entered.", "WARNING")
+            return
+
+        # Parse portfolio number
+        try:
+            portfolio_num = int(search_text)
+        except ValueError:
+            self.log_to_console(f"Search failed: '{search_text}' is not a valid number.", "ERROR")
+            return
+
+        # Determine portfolio type based on index
+        total_random = len(self._last_sample_ports)
+        total_efficient = len(self._last_eff_pts)
+
+        # Check if number is in random portfolios range (1-indexed)
+        if 1 <= portfolio_num <= total_random:
+            idx = portfolio_num - 1  # Convert to 0-indexed
+            port = self._last_sample_ports[idx]
+            port_type = "Random"
+
+            # Format display (matches on_pick behavior)
+            risk = np.around(np.sqrt(port['metadata']['Variance']), 2)
+            avreturn = np.around(port['metadata']['AverageReturn'], 2)
+            weights = port['weights']
+
+            # Get asset names from tooltip manager if available
+            if hasattr(self, "_last_tooltip_manager"):
+                weight_text = self._last_tooltip_manager.format_weights(weights)
+            else:
+                weight_text = f"Weights: {weights}"
+
+            display_text = (
+                f"Random Portfolio #{portfolio_num}\n"
+                f"Average Return: {visualization.format_currency(avreturn)}\n"
+                f"Risk (Std Dev): {risk}\n\n"
+                f"{weight_text}"
+            )
+
+            # Update info textbox
+            self.portfolio_info_text.configure(state="normal")
+            self.portfolio_info_text.delete("1.0", "end")
+            self.portfolio_info_text.insert("end", display_text)
+            self.portfolio_info_text.configure(state="disabled")
+
+            self.log_to_console(f"Found Random Portfolio #{portfolio_num}", "SUCCESS")
+        else:
+            # Portfolio number out of range
+            self.log_to_console(
+                f"Search failed: Portfolio #{portfolio_num} not found. "
+                f"Valid range: 1-{total_random} "
+                f"({total_random} random portfolios)",
+                "ERROR"
+            )
 
     def get_data_files(self):
         """Return list of files from the data directory"""
@@ -823,6 +915,7 @@ class App(customtkinter.CTk):
         self.portfolio_info_frame.grid()  # re-add portfolio frame
         self.control_tabview.grid()  # re-add control tabview
         self.console_frame.grid()  # re-add console log frame
+        self.settings_frame.grid()  # re-add settings
 
         self.current_frame = "home"
 
