@@ -246,7 +246,7 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=
 
     asset_names = [item['metadata']['Name'] for item in group_data]
 
-    fig, ax = plt.subplots(dpi=200)
+    fig, ax = plt.subplots(dpi=150)
     tm = TooltipManager(ax, info_textbox)
     tm.asset_names = asset_names
 

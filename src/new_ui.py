@@ -113,7 +113,7 @@ class App(customtkinter.CTk):
         # ============================================
         self.settings_frame = customtkinter.CTkScrollableFrame(self, label_text="Portfolio Settings",
                                                                label_font=("Segoe UI", 16, "bold"))
-        self.settings_frame.grid(row=4, column=2, rowspan=3, columnspan=2, padx=(10, 10), pady=(10, 20), sticky="nsew")
+        self.settings_frame.grid(row=4, column=3, rowspan=3, columnspan=1, padx=(10, 10), pady=(10, 20), sticky="nsew")
         self.settings_frame.grid_columnconfigure(0, weight=1)
 
         # Toggleable features (inside scrollable frame)
@@ -271,7 +271,7 @@ class App(customtkinter.CTk):
             self,
             height=160
         )
-        self.control_tabview.grid(row=4, column=1, padx=(20, 0), pady=(0, 10), sticky="nsew")
+        self.control_tabview.grid(row=4, column=1, columnspan=2, padx=(20, 0), pady=(0, 10), sticky="nsew")
         self.control_tabview.add("File Configuration")
         self.control_tabview.add("Winds of Fortune")
 
@@ -374,7 +374,7 @@ class App(customtkinter.CTk):
         # Console Frame - Contains console log textbox and clear button
         # =============================================================
         self.console_frame = customtkinter.CTkFrame(self)
-        self.console_frame.grid(row=6, column=1, columnspan=1, padx=(20, 0), pady=(0, 20), sticky="ew")
+        self.console_frame.grid(row=6, column=1, columnspan=2, padx=(20, 0), pady=(0, 20), sticky="ew")
         self.console_frame.grid_rowconfigure(1, weight=1)
         self.console_frame.grid_columnconfigure(0, weight=1)
 
@@ -770,7 +770,7 @@ class App(customtkinter.CTk):
 
                 # Regenerate figure from cached data
                 plt.close('all')
-                fig, ax = plt.subplots(dpi=200)
+                fig, ax = plt.subplots(dpi=150)
 
                 # Create TooltipManager
                 tm = visualization.TooltipManager(ax, self.portfolio_info_text)
