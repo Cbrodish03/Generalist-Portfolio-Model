@@ -516,7 +516,7 @@ class App(customtkinter.CTk):
             display_text = (
                 f"Random Portfolio #{portfolio_num}\n"
                 f"Average Return: {visualization.format_currency(avreturn)}\n"
-                f"Risk (Std Dev): {risk}\n\n"
+                f"Risk (Std Dev): {visualization.format_currency(risk)}\n\n"
                 f"{weight_text}"
             )
 
