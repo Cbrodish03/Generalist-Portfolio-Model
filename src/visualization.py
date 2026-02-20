@@ -159,14 +159,21 @@ class TooltipManager:
             elif len(self.scatters) >= 2 and artist == self.scatters[1]:
                 # efficient portfolios
                 if idx < len(self.effpts):
-                    avreturn = np.around(self.effpts[idx]['metadata']['AverageReturn'], 2)
-                    risk = np.around(np.sqrt(self.effpts[idx]['metadata']['Variance']), 2)
-                    weights = self.effpts[idx]['weights']
-                    # print(f"Efficient Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
+                    meta = self.randpts[idx]['metadata']
+
+                    avreturn = float(meta.get('AverageReturn', np.nan))
+                    risk = float(np.sqrt(meta.get('Variance', np.nan)))
+                    p10 = meta.get('PercentileOM', None)
+                    
+                    weights = self.randpts[idx]['weights']
+                    
+                    # print(f"Random Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
                     weight_text = self.format_weights(weights)
+                    
                     self.display_info(
-                        f"Efficient Portfolio #{idx + 1}\n"
+                        f"Random Portfolio #{idx + 1}\n"
                         f"Average Return: {format_currency(avreturn)}\n"
+                        f"P10 (10th %ile): {format_currency(p10) if p10 is not None else 'N/A'}\n"
                         f"Risk (Std Dev): {format_currency(risk)}\n\n"
                         f"{weight_text}"
                     )
