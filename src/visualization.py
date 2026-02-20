@@ -196,7 +196,7 @@ def plot_rand(random_ports):
 
     # Populate arrays with standard deviation and average return values of random ports
     for i in range(count):
-        xs.append(np.sqrt(random_ports[i]['metadata']['Variance']))
+        xs.append(random_ports[i]['metadata']['PercentileOM'])
         ys.append(random_ports[i]['metadata']['AverageReturn'])
 
     return xs, ys
@@ -233,7 +233,7 @@ def plot_frontier(group_data):
     xs = []
     ys = []
     for i in range(len(eff_points)):
-        xs.append(np.sqrt(eff_points[i]['metadata']['Variance']))
+        xs.append(random_ports[i]['metadata']['PercentileOM'])
         ys.append(eff_points[i]['metadata']['AverageReturn'])
 
     # plt.plot(x, y, 'r', ls='--')
@@ -284,7 +284,7 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=
     tm.eff_scatter = eff_scatter
     tm.frontier_line = frontier_line
 
-    ax.set_xlabel("Risk (Std Dev)")
+    ax.set_xlabel("Risk (P10)")
     ax.set_ylabel("Average Return ($)")
 
     # Currency formatter using your existing function
