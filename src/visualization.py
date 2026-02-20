@@ -145,7 +145,7 @@ class TooltipManager:
                     self.display_info(
                         f"Random Portfolio #{idx + 1}\n"
                         f"Average Return: {format_currency(avreturn)}\n"
-                        f"Risk (Std Dev): {risk}\n\n"
+                        f"Risk (Std Dev): {format_currency(risk)}\n\n"
                         f"{weight_text}"
                     )
             elif len(self.scatters) >= 2 and artist == self.scatters[1]:
@@ -159,7 +159,7 @@ class TooltipManager:
                     self.display_info(
                         f"Efficient Portfolio #{idx + 1}\n"
                         f"Average Return: {format_currency(avreturn)}\n"
-                        f"Risk (Std Dev): {risk}\n\n"
+                        f"Risk (Std Dev): {format_currency(risk)}\n\n"
                         f"{weight_text}"
                     )
 
