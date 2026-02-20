@@ -505,6 +505,7 @@ class App(customtkinter.CTk):
             # Format display (matches on_pick behavior)
             risk = np.around(np.sqrt(port['metadata']['Variance']), 2)
             avreturn = np.around(port['metadata']['AverageReturn'], 2)
+            p10 = port['metadata'].get('PercentileOM', None)
             weights = port['weights']
 
             # Get asset names from tooltip manager if available
@@ -516,7 +517,8 @@ class App(customtkinter.CTk):
             display_text = (
                 f"Random Portfolio #{portfolio_num}\n"
                 f"Average Return: {visualization.format_currency(avreturn)}\n"
-                f"Risk (Std Dev): {risk}\n\n"
+                f"P10 (10th %ile): {visualization.format_currency(p10) if p10 is not None else 'N/A'}\n"
+                f"Risk (Std Dev): {visualization.format_currency(risk)}\n\n"
                 f"{weight_text}"
             )
 
