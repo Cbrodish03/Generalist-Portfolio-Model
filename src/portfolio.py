@@ -59,7 +59,7 @@ class Portfolio:
          'PortType': port_type,
          'ExpectedRevenue': expected_rev,
          'AverageReturn': mean * expected_rev,
-         'Variance': var * expected_rev,
+         'Variance': var * (expected_rev ** 2),
          'PercentileOM': percentile * expected_rev,
          'IsParetoEff': False
       }
