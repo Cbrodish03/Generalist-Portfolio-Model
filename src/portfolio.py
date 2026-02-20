@@ -53,7 +53,7 @@ class Portfolio:
       # Split the avg_return & variance calculations into two processes since it kept throwing a runtime error :/
       mean = np.mean(new_trials)
       var = np.var(new_trials)
-      percentile = np.percentile(new_trials, 10)      # TODO: make user-defined!
+      percentile = np.percentile(new_trials, 10)      # TODO: make user-defined! Set to 90th percentile
          
       port['metadata'] = {
          'PortType': port_type,
