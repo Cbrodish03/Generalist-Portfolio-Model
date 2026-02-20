@@ -3,6 +3,7 @@ import hashlib
 import json
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import variance_calcs as vc
 from parser import SIPParser
@@ -271,6 +272,14 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=
 
     ax.set_xlabel("Risk (Std Dev)")
     ax.set_ylabel("Average Return ($)")
+
+    # Currency formatter using your existing function
+    currency_formatter = FuncFormatter(lambda x, pos: format_currency(x))
+
+    ax.xaxis.set_major_formatter(currency_formatter)
+    ax.yaxis.set_major_formatter(currency_formatter)
+
+    
     ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
     ax.grid(ls="--")
 
