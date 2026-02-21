@@ -1,0 +1,51 @@
+# ============================================================
+# Generalist Portfolio Model — Python Dependencies
+# ============================================================
+# Python >= 3.11 required
+#
+# Install:
+#   pip install -r requirements.txt
+#
+# For a reproducible environment, create a virtualenv first:
+#   python -m venv .venv && source .venv/bin/activate
+# ============================================================
+
+
+# --- Numerical Computing --------------------------------
+numpy>=1.26.0
+
+
+# --- Data Parsing & I/O ---------------------------------
+pandas>=2.1.0
+
+# Required: pandas Excel engine used in parser.py
+# engine="calamine" in pd.read_excel() will fail without this
+python-calamine>=0.1.0
+
+
+# --- Optimization ---------------------------------------
+# Used in portfolio.py for Markowitz efficient frontier QP
+# SCS solver is bundled with cvxpy (no separate install needed)
+cvxpy>=1.4.0
+
+
+# --- Visualization --------------------------------------
+matplotlib>=3.8.0
+
+
+# --- UI Framework ---------------------------------------
+# CustomTkinter wraps Tkinter with a modern widget set.
+# Tkinter itself is part of the Python standard library
+# and does NOT need to be installed via pip.
+# If tkinter is missing on Linux: sudo apt install python3-tk
+customtkinter>=5.2.0
+
+
+# ============================================================
+# Standard Library Modules (no install required)
+# ============================================================
+# The following are used throughout the project but are
+# included with every CPython distribution:
+#
+#   os, csv, json, hashlib, datetime, time, tkinter
+# ============================================================
