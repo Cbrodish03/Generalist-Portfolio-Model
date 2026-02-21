@@ -14,26 +14,32 @@ from sample_portfolios import RandomPortfolios
 
 class TooltipManager:
     def __init__(self, ax, info_textbox=None, canvas=None):
-        # Create MPL Artist to reference
+        """
+        Manages scatter plot tooltips, click interactions, and point highlighting.
+
+        :param ax:           Matplotlib Axes to attach interaction handlers to
+        :param info_textbox: Optional CTkTextbox for displaying portfolio detail on pick
+        :param canvas:       Optional FigureCanvasTkAgg; falls back to fig.canvas if omitted
+        """
         self.ax = ax
         self.fig = ax.figure
-        self.info_textbox = info_textbox  # textbox reference for UI
+        self.info_textbox = info_textbox
         self.show_efficient_frontier = False
-
         self.asset_names = []
-
-        # Create array of scatter-plot data
         self.scatters = []
-        # Separate arrays for each dataset
         self.randpts = []
         self.effpts = []
 
-        # Configure hovering tooltip
+        # Highlight artist drawn over the currently selected portfolio point
+        self.highlight_point = None
+
+        # Optional callback fired on pick: fn(idx: int, port_type: str)
+        self.on_select_callback = None
+
         self.annot = ax.annotate("", xy=(0, 0), xytext=(20, 20), textcoords="offset points",
                                  bbox=dict(boxstyle="round", fc="w"), arrowprops=dict(arrowstyle="->"))
-
-        # Tooltip visibility rules
         self.annot.set_visible(False)
+
         if canvas is None:
             self.canvas = self.fig.canvas
         else:
@@ -41,6 +47,27 @@ class TooltipManager:
 
         self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
         self.fig.canvas.mpl_connect("pick_event", self.on_pick)
+
+    def set_highlight(self, x, y):
+        # Remove the previous highlight ring and draw a new one at (x, y)
+        if self.highlight_point is not None:
+            self.highlight_point.remove()
+        self.highlight_point = self.ax.scatter(
+            [x], [y],
+            s=180,
+            facecolors='none',
+            edgecolors='orange',
+            linewidths=2.5,
+            zorder=5
+        )
+        # self.canvas.draw_idle()
+
+    def clear_highlight(self):
+        # Remove the highlight ring if one is currently drawn
+        if self.highlight_point is not None:
+            self.highlight_point.remove()
+            self.highlight_point = None
+            self.canvas.draw_idle()
 
     def display_info(self, text):
         if self.info_textbox is None:
@@ -103,12 +130,15 @@ class TooltipManager:
 
     def on_pick(self, event):
         """
-        Handle a matplotlib pick event by identifying the clicked portfolio
-        and displaying its formatted info in the Portfolio Information panel.
-        When multiple points overlap, the one closest to the cursor is selected.
+        Handle a matplotlib pick event by identifying the clicked portfolio,
+        displaying its info in the Portfolio Information panel, and highlighting
+        the selected point on the scatter plot.
 
         :param event: matplotlib PickEvent — contains artist, ind, and mouseevent
-        :side effects: Calls self.display_info() to update the UI textbox
+        :side effects:
+            - Calls self.display_info() to update the UI textbox
+            - Calls self.set_highlight() to mark the selected point
+            - Fires self.on_select_callback(idx, port_type) if set
         """
         try:
             artist = event.artist
@@ -129,12 +159,15 @@ class TooltipManager:
                     d2 = np.sum((cand - np.array([mx, my])) ** 2, axis=1)
                     idx = int(inds[np.argmin(d2)])
 
+            port_type = None
+
             if len(self.scatters) >= 2 and artist == self.scatters[0]:
                 if idx < len(self.randpts):
                     text = format_portfolio_info(
                         self.randpts[idx], idx + 1, "Random", self.asset_names
                     )
                     self.display_info(text)
+                    port_type = "Random"
 
             elif len(self.scatters) >= 2 and artist == self.scatters[1]:
                 if idx < len(self.effpts):
@@ -142,6 +175,15 @@ class TooltipManager:
                         self.effpts[idx], idx + 1, "Efficient", self.asset_names
                     )
                     self.display_info(text)
+                    port_type = "Efficient"
+
+            if port_type is not None:
+                coords = artist.get_offsets()[idx]
+                self.set_highlight(float(coords[0]), float(coords[1]))
+                self.canvas.draw_idle()  # interactive pick — idle redraw is sufficient
+
+                if self.on_select_callback is not None:
+                    self.on_select_callback(idx, port_type)
 
         except Exception as e:
             print("Error in on_pick:", e)

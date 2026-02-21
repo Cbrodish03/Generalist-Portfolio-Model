@@ -64,6 +64,9 @@ class App(customtkinter.CTk):
         self.winds_template_file = None  # path to template file
         self.winds_sip_file = None  # path to winds SIP file
 
+        # Tracks the last selected portfolio for highlight restoration across rebuilds
+        self._last_selection = None  # {'idx': int, 'port_type': 'Random' | 'Efficient'}
+
         # configure grid layout (4x4)
         self.grid_columnconfigure((1, 2, 3), weight=1)
         self.grid_rowconfigure((0, 1, 2), weight=1)
@@ -472,11 +475,13 @@ class App(customtkinter.CTk):
         """
         Locate and display a random portfolio by its 1-based display index.
         Reads the search entry, validates the input, bounds-checks against the
-        last generated portfolio list, and populates the Portfolio Information
-        panel using the shared format_portfolio_info formatter.
+        last generated portfolio list, populates the Portfolio Information panel,
+        and highlights the selected point on the scatter plot.
 
         :side effects:
             - Updates self.portfolio_info_text with formatted portfolio data
+            - Updates self._last_selection for highlight restoration
+            - Calls TooltipManager.set_highlight to mark the point on the graph
             - Calls self.log_to_console with status messages
         """
         if not hasattr(self, "_last_sample_ports") or not hasattr(self, "_last_eff_pts"):
@@ -497,7 +502,8 @@ class App(customtkinter.CTk):
         total_random = len(self._last_sample_ports)
 
         if 1 <= portfolio_num <= total_random:
-            port = self._last_sample_ports[portfolio_num - 1]
+            idx = portfolio_num - 1
+            port = self._last_sample_ports[idx]
             asset_names = (
                 self._last_tooltip_manager.asset_names
                 if hasattr(self, "_last_tooltip_manager")
@@ -510,6 +516,14 @@ class App(customtkinter.CTk):
             self.portfolio_info_text.delete("1.0", "end")
             self.portfolio_info_text.insert("end", display_text)
             self.portfolio_info_text.configure(state="disabled")
+
+            self._last_selection = {'idx': idx, 'port_type': 'Random'}
+            if hasattr(self, '_last_tooltip_manager'):
+                x = port['metadata']['PercentileOM']
+                y = port['metadata']['AverageReturn']
+                self._last_tooltip_manager.set_highlight(x, y)
+                self._last_canvas.draw()  # force immediate render
+
             self.log_to_console(f"Found Random Portfolio #{portfolio_num}", "SUCCESS")
         else:
             self.log_to_console(
@@ -517,6 +531,53 @@ class App(customtkinter.CTk):
                 f"Valid range: 1–{total_random}.",
                 "ERROR"
             )
+
+    def _on_portfolio_selected(self, idx, port_type):
+        """
+        Callback fired by TooltipManager.on_pick to persist the current selection.
+        Stored selection is used by _restore_highlight after visualization rebuilds.
+
+        :param idx:       0-based index of the selected portfolio in its list
+        :param port_type: 'Random' or 'Efficient'
+        """
+        self._last_selection = {'idx': idx, 'port_type': port_type}
+
+    def _restore_highlight(self):
+        """
+        Re-applies the highlight ring to the previously selected portfolio point
+        after a visualization has been rebuilt (live, cached, or winds toggled).
+        Forces an immediate canvas redraw so the ring is visible before control
+        returns to the Tkinter event loop.
+        Silently no-ops if no selection exists or the index is out of range.
+
+        :side effects:
+            - Calls TooltipManager.set_highlight if a valid selection exists
+            - Calls self._last_canvas.draw() to force immediate render
+        """
+        if self._last_selection is None:
+            return
+        if not hasattr(self, '_last_tooltip_manager') or not hasattr(self, '_last_canvas'):
+            return
+
+        idx = self._last_selection['idx']
+        port_type = self._last_selection['port_type']
+
+        ports = (
+            self._last_sample_ports if port_type == 'Random'
+            else getattr(self, '_last_eff_pts', [])
+        )
+
+        if idx >= len(ports):
+            # Selection no longer valid for this dataset
+            self._last_selection = None
+            return
+
+        port = ports[idx]
+        x = port['metadata']['PercentileOM']
+        y = port['metadata']['AverageReturn']
+        # self.log_to_console(f"Restoring highlight: {port_type} Portfolio #{idx + 1} at (Risk: {x:.4f}, Return: {y:.4f})", "INFO")
+        self._last_tooltip_manager.set_highlight(x, y)
+        self._last_canvas.draw()  # force immediate render — draw_idle() is not reliable here
 
     def get_data_files(self):
         """Return list of files from the data directory"""
@@ -756,6 +817,7 @@ class App(customtkinter.CTk):
 
                 # Create TooltipManager
                 tm = visualization.TooltipManager(ax, self.portfolio_info_text)
+                tm.on_select_callback = self._on_portfolio_selected
                 tm.asset_names = asset_names
 
                 # Extract plot coordinates from cached portfolio data
@@ -786,6 +848,8 @@ class App(customtkinter.CTk):
                     data_to_use, count, self.portfolio_info_text, show_frontier=show_frontier, seed=seed
                 )
 
+                tm.on_select_callback = self._on_portfolio_selected
+
                 # store data in cache
                 asset_names = [item['metadata']['Name'] for item in data_to_use]
                 cache_data = {
@@ -814,6 +878,9 @@ class App(customtkinter.CTk):
 
             self._frontier_line = frontier_line
             self._eff_scatter = eff_scatter
+
+            # Restore highlight for previously selected portfolio (survives winds toggle / cache swap)
+            self.after(0, self._restore_highlight)  # schedule after current event loop to ensure canvas is ready
 
             # Embed figure in the Tkinter tab
             fig.tight_layout()  # adjust layout before embedding
