@@ -87,8 +87,8 @@ Traditional portfolio tools assume deterministic inputs (e.g., a single expected
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/generalist-portfolio-model.git
-cd generalist-portfolio-model
+git clone https://github.com/Cbrodish03/Generalist-Portfolio-Model.git
+cd Generalist-Portfolio-Model
 ```
 
 ### Step 2 — Create and Activate a Virtual Environment
