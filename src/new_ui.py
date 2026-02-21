@@ -800,10 +800,17 @@ class App(customtkinter.CTk):
             # Apply axis limits if specified
             if axis_limits:
                 ax = fig.axes[0]
-                if axis_limits['x_min'] is not None or axis_limits['x_max'] is not None:
-                    ax.set_xlim(left=axis_limits['x_min'], right=axis_limits['x_max'])
-                if axis_limits['y_min'] is not None or axis_limits['y_max'] is not None:
-                    ax.set_ylim(bottom=axis_limits['y_min'], top=axis_limits['y_max'])
+                x_min = axis_limits.get('x_min')
+                x_max = axis_limits.get('x_max')
+                y_min = axis_limits.get('y_min')
+                y_max = axis_limits.get('y_max')
+
+                # X-axis is inverted: left=larger value (low risk), right=smaller value (high risk)
+                # Swap x_min/x_max so set_xlim respects the inversion direction
+                if x_min is not None or x_max is not None:
+                    ax.set_xlim(left=x_max, right=x_min)
+                if y_min is not None or y_max is not None:
+                    ax.set_ylim(bottom=y_min, top=y_max)
 
             self._frontier_line = frontier_line
             self._eff_scatter = eff_scatter
