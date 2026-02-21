@@ -362,6 +362,7 @@ def apply_axis_formatting(ax, count):
     currency_formatter = FuncFormatter(lambda x, pos: f"${x:,.0f}")
     ax.xaxis.set_major_formatter(currency_formatter)
     ax.yaxis.set_major_formatter(currency_formatter)
+    ax.invert_xaxis()  # Invert x-axis so higher risk (P10) is on the right
     ax.set_xlabel("Risk (P10)")
     ax.set_ylabel("Average Return ($)")
     ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
