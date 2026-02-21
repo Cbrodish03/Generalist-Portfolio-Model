@@ -470,71 +470,51 @@ class App(customtkinter.CTk):
 
     def search_portfolio(self):
         """
-        Search for and display a portfolio by its index number
-        Simulates clicking the portfolio on the graph
-        :return:
+        Locate and display a random portfolio by its 1-based display index.
+        Reads the search entry, validates the input, bounds-checks against the
+        last generated portfolio list, and populates the Portfolio Information
+        panel using the shared format_portfolio_info formatter.
+
+        :side effects:
+            - Updates self.portfolio_info_text with formatted portfolio data
+            - Calls self.log_to_console with status messages
         """
-        # Validate visualization exists
         if not hasattr(self, "_last_sample_ports") or not hasattr(self, "_last_eff_pts"):
-            self.log_to_console("No portfolios available - run visualization first.", "WARNING")
+            self.log_to_console("No portfolios available — run visualization first.", "WARNING")
             return
 
-        # Get search input
         search_text = self.portfolio_search_entry.get().strip()
         if not search_text:
             self.log_to_console("Search failed: No portfolio number entered.", "WARNING")
             return
 
-        # Parse portfolio number
         try:
             portfolio_num = int(search_text)
         except ValueError:
             self.log_to_console(f"Search failed: '{search_text}' is not a valid number.", "ERROR")
             return
 
-        # Determine portfolio type based on index
         total_random = len(self._last_sample_ports)
-        total_efficient = len(self._last_eff_pts)
 
-        # Check if number is in random portfolios range (1-indexed)
         if 1 <= portfolio_num <= total_random:
-            idx = portfolio_num - 1  # Convert to 0-indexed
-            port = self._last_sample_ports[idx]
-            port_type = "Random"
-
-            # Format display (matches on_pick behavior)
-            risk = np.around(np.sqrt(port['metadata']['Variance']), 2)
-            avreturn = np.around(port['metadata']['AverageReturn'], 2)
-            p10 = port['metadata'].get('PercentileOM', None)
-            weights = port['weights']
-
-            # Get asset names from tooltip manager if available
-            if hasattr(self, "_last_tooltip_manager"):
-                weight_text = self._last_tooltip_manager.format_weights(weights)
-            else:
-                weight_text = f"Weights: {weights}"
-
-            display_text = (
-                f"Random Portfolio #{portfolio_num}\n"
-                f"Average Return: {visualization.format_currency(avreturn)}\n"
-                f"P10 (10th %ile): {visualization.format_currency(p10) if p10 is not None else 'N/A'}\n"
-                f"Risk (Std Dev): {visualization.format_currency(risk)}\n\n"
-                f"{weight_text}"
+            port = self._last_sample_ports[portfolio_num - 1]
+            asset_names = (
+                self._last_tooltip_manager.asset_names
+                if hasattr(self, "_last_tooltip_manager")
+                else []
             )
-
-            # Update info textbox
+            display_text = visualization.format_portfolio_info(
+                port, portfolio_num, "Random", asset_names
+            )
             self.portfolio_info_text.configure(state="normal")
             self.portfolio_info_text.delete("1.0", "end")
             self.portfolio_info_text.insert("end", display_text)
             self.portfolio_info_text.configure(state="disabled")
-
             self.log_to_console(f"Found Random Portfolio #{portfolio_num}", "SUCCESS")
         else:
-            # Portfolio number out of range
             self.log_to_console(
                 f"Search failed: Portfolio #{portfolio_num} not found. "
-                f"Valid range: 1-{total_random} "
-                f"({total_random} random portfolios)",
+                f"Valid range: 1–{total_random}.",
                 "ERROR"
             )
 
@@ -760,7 +740,7 @@ class App(customtkinter.CTk):
                     return
 
             # Cache Integration - check if we have a cached version
-            cache_key = self.generate_viz_cache_key(use_winds, count, seed)
+            cache_key = self.generate_viz_cache_key(use_winds, count, seed, self.file_selector.get())
             cached = self.get_cached_visualization(cache_key)
 
             if cached is not None:
@@ -779,9 +759,9 @@ class App(customtkinter.CTk):
                 tm.asset_names = asset_names
 
                 # Extract plot coordinates from cached portfolio data
-                rx = [np.sqrt(p['metadata']['Variance']) for p in sample_ports]
+                rx = [p['metadata']['PercentileOM'] for p in sample_ports]
                 ry = [p['metadata']['AverageReturn'] for p in sample_ports]
-                ex = [np.sqrt(p['metadata']['Variance']) for p in effpts]
+                ex = [p['metadata']['PercentileOM'] for p in effpts]
                 ey = [p['metadata']['AverageReturn'] for p in effpts]
 
                 # Plot data
@@ -797,12 +777,8 @@ class App(customtkinter.CTk):
                 tm.eff_scatter = eff_scatter
                 tm.frontier_line = frontier_line
 
-                # Configure axes
-                ax.set_xlabel("Risk (Std Dev)")
-                ax.set_ylabel("Average Return ($)")
-                ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
-                ax.grid(ls="--")
-
+                # Apply consistent axis formatting — must mirror visualize_portfolios()
+                visualization.apply_axis_formatting(ax, count)
             else:
                 # Cache miss - proceed to generate visualization normally
                 self.log_to_console("No cached data found. Generating new visualization...", "INFO")
@@ -1016,22 +992,25 @@ class App(customtkinter.CTk):
         self.console_textbox.configure(state="disabled")
         self.log_to_console("Console cleared.", "INFO")
 
-    def generate_viz_cache_key(self, use_winds, count, seed):
+    def generate_viz_cache_key(self, use_winds, count, seed, filename):
         """
-        Generate a unique cache key for the visualization parameters.
-        :param use_winds: Whether Winds of Fortune is used
-        :param count: Number of portfolios
-        :param seed: Random seed
-        :return: String cache key
-        """
+        Produce a stable MD5 cache key from all parameters that uniquely identify
+        a visualization run. Including the source filename prevents stale cache
+        hits when the same count/seed combination is requested against a different
+        data file.
 
+        :param use_winds: bool — whether Winds of Fortune data was applied
+        :param count:     int  — number of random portfolios generated
+        :param seed:      int  — RNG seed used for portfolio generation
+        :param filename:  str  — basename of the parsed SIP file
+        :return:          str  — hex digest cache key
+        """
         cache_dict = {
+            'filename': filename,
             'use_winds': use_winds,
             'count': count,
             'seed': seed,
         }
-
-        # convert to JSON string and hash for key
         cache_str = json.dumps(cache_dict, sort_keys=True)
         return hashlib.md5(cache_str.encode()).hexdigest()
 

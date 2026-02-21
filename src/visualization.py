@@ -103,81 +103,47 @@ class TooltipManager:
 
     def on_pick(self, event):
         """
-        Handles displaying portfolio information from the graph
-        If multiple portfolios exist in the same event, we pick the closest to the user's cursor position
-        :param event: the event we get from the handler
+        Handle a matplotlib pick event by identifying the clicked portfolio
+        and displaying its formatted info in the Portfolio Information panel.
+        When multiple points overlap, the one closest to the cursor is selected.
+
+        :param event: matplotlib PickEvent — contains artist, ind, and mouseevent
+        :side effects: Calls self.display_info() to update the UI textbox
         """
         try:
             artist = event.artist
             if not hasattr(event, "ind"):
                 return
-            inds = np.atleast_1d(event.ind)  # ensures array-like
+            inds = np.atleast_1d(event.ind)
 
-            # get mouse click position in data coords (fallback if missing)
             me = getattr(event, "mouseevent", None)
             if me is None or me.xdata is None or me.ydata is None:
-                # if mouse coords not available, just take the first index
                 idx = int(inds[0])
             else:
                 mx, my = me.xdata, me.ydata
-
-                # get offsets for this artist (scatter)
                 offsets = artist.get_offsets()
                 if offsets is None or len(offsets) == 0:
                     idx = int(inds[0])
                 else:
-                    # extract candidate points' coordinates
-                    cand = offsets[inds]  # shape (k, 2)
-                    # compute squared distances in data space
+                    cand = offsets[inds]
                     d2 = np.sum((cand - np.array([mx, my])) ** 2, axis=1)
-                    # pick index of smallest distance among candidates
-                    best_rel = np.argmin(d2)
-                    idx = int(inds[best_rel])
+                    idx = int(inds[np.argmin(d2)])
 
-            # now idx is a single integer index we can safely use
-            # determine which scatter was clicked and respond
             if len(self.scatters) >= 2 and artist == self.scatters[0]:
-                # random portfolios
                 if idx < len(self.randpts):
-                    meta = self.randpts[idx]['metadata']
-                    avreturn = float(meta.get('AverageReturn', np.nan))
-                    risk = float(np.sqrt(meta.get('Variance', np.nan)))
-                    p10 = meta.get('PercentileOM', None)
-
-                    weights = self.randpts[idx]['weights']
-                    # print(f"Random Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
-                    weight_text = self.format_weights(weights)
-                    self.display_info(
-                        f"Random Portfolio #{idx + 1}\n"
-                        f"Average Return: {format_currency(avreturn)}\n"
-                        f"P10 (10th %ile): {format_currency(p10) if p10 is not None else 'N/A'}\n"
-                        f"Risk (Std Dev): {format_currency(risk)}\n\n"
-                        f"{weight_text}"
+                    text = format_portfolio_info(
+                        self.randpts[idx], idx + 1, "Random", self.asset_names
                     )
+                    self.display_info(text)
+
             elif len(self.scatters) >= 2 and artist == self.scatters[1]:
-                # efficient portfolios
                 if idx < len(self.effpts):
-                    meta = self.randpts[idx]['metadata']
-
-                    avreturn = float(meta.get('AverageReturn', np.nan))
-                    risk = float(np.sqrt(meta.get('Variance', np.nan)))
-                    p10 = meta.get('PercentileOM', None)
-
-                    weights = self.randpts[idx]['weights']
-                    # print(f"Efficient Portfolio #{idx + 1}:\nAverage Return: ${avreturn} | Risk (std dev): ${risk}\nAsset Weights: {weights}")
-                    weight_text = self.format_weights(weights)
-                    self.display_info(
-                        f"Efficient Portfolio #{idx + 1}\n"
-                        f"Random Portfolio #{idx + 1}\n"
-                        f"Average Return: {format_currency(avreturn)}\n"
-                        f"Risk (Std Dev): {risk}\n\n"
-                        f"P10 (10th %ile): {format_currency(p10) if p10 is not None else 'N/A'}\n"
-                        f"Risk (Std Dev): {format_currency(risk)}\n\n"
-                        f"{weight_text}"
+                    text = format_portfolio_info(
+                        self.effpts[idx], idx + 1, "Efficient", self.asset_names
                     )
+                    self.display_info(text)
 
         except Exception as e:
-            # Defensive: avoid crashing the app on unexpected pick-event structures
             print("Error in on_pick:", e)
 
 
@@ -190,66 +156,65 @@ def plot_rand(random_ports):
     xs = []
     ys = []
     # Populate arrays with standard deviation and average return values of random ports
-    for i in range(len(random_ports)):
-        xs.append(np.sqrt(random_ports[i]['metadata']['PercentileOM']))
-        ys.append(random_ports[i]['metadata']['AverageReturn'])
+    for port in random_ports:
+        xs.append(port['metadata']['PercentileOM'])
+        ys.append(port['metadata']['AverageReturn'])
     return xs, ys
 
 
 def plot_frontier(group_data):
     """
-    Plots the 'Markowitz bullet'/efficient frontier
-    :param group_data: SIP trial data
-    """
+    Compute and return efficient frontier portfolio points.
+    X-axis: P10 (10th percentile return in dollars).
+    Y-axis: Average return in dollars.
+    Only non-negative-weight portfolios are included.
+    Portfolios below the minimum-variance portfolio are pruned to
+    prevent the lower arc from appearing on the chart.
 
+    :param group_data: List of SIP investment dicts (parsed trial data)
+    :return: (xs, ys, eff_points)
+        xs         — list of P10 values for each efficient portfolio
+        ys         — list of average return values
+        eff_points — list of portfolio dicts for tooltip/export use
+    """
     a, b, c, ymax = vc.compute_coeffs(group_data)
 
     eff_points = []
-    ymin = b / (2 * a)      # Ballpark min average return
-    mus = np.linspace(ymin, ymax, 50)  # 50 = num of eff ports drawn
+    ymin = b / (2 * a)
+    mus = np.linspace(ymin, ymax, 50)
+
     for mu in mus:
         port = Portfolio()
         effpt = port.construct_port(group_data, 'e', mu)
-
         if np.all(effpt['weights'] >= 0):
             eff_points.append(effpt)
 
-    # Filter out efficient ports below min variance port (fix bending)
-    # Compute standard deviations for all points
+    # Prune lower arc: keep only portfolios at or above minimum-variance point
     stds = [np.sqrt(p['metadata']['Variance']) for p in eff_points]
-
-    # Find index of minimum variance (i.e. bottom of the U)
     min_var_idx = int(np.argmin(stds))
-
-    # Keep only points ABOVE (to the right of) the min-var portfolio
     eff_points = eff_points[min_var_idx:]
-    
-    xs = []
-    ys = []
-    for i in range(len(eff_points)):
-        xs.append(np.sqrt(eff_points[i]['metadata']['PercentileOM']))
-        ys.append(eff_points[i]['metadata']['AverageReturn'])
 
-    # plt.plot(x, y, 'r', ls='--')
+    xs = [p['metadata']['PercentileOM'] for p in eff_points]
+    ys = [p['metadata']['AverageReturn'] for p in eff_points]
+
     return xs, ys, eff_points
 
 
 def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=None, show_frontier=True):
     """
-    Generates random portfolios and plots them with efficient frontier.
+    Generates random portfolios and plots them with the efficient frontier.
 
-    :param group_data: SIP trial data used to generate portfolios
-    :param count: number of random portfolios to generate
-    :param info_textbox: optional CustomTkinter textbox for displaying portfolio info
-    :param plot: if True, displays plot immediately (for standalone testing)
-    :param seed: optional integer seed for reproducible random generation
-    :param show_frontier: initial visibility state for efficient frontier elements
-    :return: (figure, TooltipManager, sample_ports, effpts, frontier_line, eff_scatter)
+    :param group_data:    List of SIP investment dicts (parsed trial data)
+    :param count:         Number of random portfolios to generate
+    :param info_textbox:  Optional CTkTextbox for displaying portfolio info on click
+    :param plot:          If True, calls plt.show() immediately (standalone testing only)
+    :param seed:          Optional integer seed for reproducible generation
+    :param show_frontier: Initial visibility state for efficient frontier elements
+    :return: (fig, TooltipManager, sample_ports, effpts, frontier_line, eff_scatter)
     """
     gen = RandomPortfolios(seed=seed)
     sample_ports = gen.generate_sample(group_data, count=count)
 
-    # Always generate efficient frontier data
     ex, ey, effpts = plot_frontier(group_data)
     rx, ry = plot_rand(sample_ports)
 
@@ -259,36 +224,19 @@ def visualize_portfolios(group_data, count, info_textbox=None, plot=False, seed=
     tm = TooltipManager(ax, info_textbox)
     tm.asset_names = asset_names
 
-    # Plot random portfolios (always visible)
     random_scatter = tm.add_scatter(rx, ry, c='b', s=15, picker=True, pickradius=5)
 
-    # Plot efficient portfolios (visibility controlled by show_frontier parameter)
     eff_scatter = tm.add_scatter(ex, ey, c='r', marker='*', picker=True, pickradius=5)
     eff_scatter.set_visible(show_frontier)
 
-    # Plot frontier line (visibility controlled by show_frontier parameter)
-    # CRITICAL: ax.plot() returns a list; unpack to get the Line2D object
     frontier_line, = ax.plot(ex, ey, c='r', ls='--', visible=show_frontier)
 
-    # Store portfolio data for tooltip system
     tm.randpts = sample_ports
     tm.effpts = effpts
-
-    # Store references for external toggling (UI needs these)
     tm.eff_scatter = eff_scatter
     tm.frontier_line = frontier_line
 
-    ax.set_xlabel("Risk (P10)")
-    ax.set_ylabel("Average Return ($)")
-
-    # Currency formatter using your existing function
-    currency_formatter = FuncFormatter(lambda x, pos: f"${x:,.0f}")
-
-    ax.xaxis.set_major_formatter(currency_formatter)
-    ax.yaxis.set_major_formatter(currency_formatter)
-
-    ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
-    ax.grid(ls="--")
+    apply_axis_formatting(ax, count)
 
     if plot:
         plt.show()
@@ -310,46 +258,6 @@ def toggle_efficient_frontier(self):
 def format_currency(value):
     """Formats a number as currency with two decimal places and a dollar sign."""
     return f"${value:,.2f}"
-
-
-""" def pareto_plot(group_data, count):
-   gen = RandomPortfolios()
-   sample_ports = gen.generate_sample(group_data, count=count)
-
-   xs = []
-   ys = []
-   pfx = []
-   pfy = []
-
-   for port in sample_ports:
-      if port['metadata']['IsParetoEff'] == True:
-         pfx.append(port['metadata']['PercentileOM'])
-         pfy.append(port['metadata']['AverageReturn'])
-      else:
-         xs.append(port['metadata']['PercentileOM'])
-         ys.append(port['metadata']['AverageReturn'])
-   
-   plt.scatter(xs, ys, s=15)
-   plt.scatter(pfx, pfy, marker='*')
-   plt.show() """
-
-def test_winds_plot():
-    # create test case to test the parser functionality
-    test_parser = SIPParser("data/mock_sipmath_v2.xlsx")
-
-    test_winds_parser = SIPParser("data/Winds_of_Fortune_Template.xlsx")
-
-    test_winds_sip_parser = SIPParser("data/Winds_of_Fortune_SIP.xlsx")
-
-    # test winds application
-    adjusted_sips = test_parser.apply_winds(
-        simulated_groups=test_parser.investments,
-        template_groups=test_winds_parser.investments,
-        wind_groups=test_winds_sip_parser.investments)
-
-    # group_data = adjusted_sips
-    count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
-    visualize_portfolios(adjusted_sips, count=count, plot=True)
 
 def export_portfolios_to_csv(filepath, random_ports, eff_ports):
     """
@@ -415,6 +323,71 @@ def export_portfolios_to_csv(filepath, random_ports, eff_ports):
     except Exception as e:
         print(f"Error opening file {filepath} for writing: {e}")
         return False
+
+def format_portfolio_info(port, idx, port_type, asset_names):
+    """
+    Produce a formatted multi-line string describing a portfolio for display
+    in the Portfolio Information panel.
+
+    :param port:        Portfolio dict with 'metadata' and 'weights' keys
+    :param idx:         1-based display index (shown to user)
+    :param port_type:   Label string, e.g. "Random" or "Efficient"
+    :param asset_names: Ordered list of asset name strings (matches weight indices)
+    :return:            Formatted string ready for insertion into a CTkTextbox
+    """
+    meta = port['metadata']
+    avg_return = float(meta.get('AverageReturn', float('nan')))
+    p10 = meta.get('PercentileOM', None)
+    std_dev = float(np.sqrt(meta.get('Variance', float('nan'))))
+    weights = port['weights']
+
+    lines = [
+        f"{port_type} Portfolio #{idx}",
+        f"{'─' * 30}",
+        f"Average Return : {format_currency(avg_return)}",
+        f"P10 (Risk)     : {format_currency(p10) if p10 is not None else 'N/A'}",
+        f"Std Dev        : {format_currency(std_dev)}",
+        f"",
+        f"Weights:",
+    ]
+
+    for i, w in enumerate(weights):
+        name = asset_names[i] if i < len(asset_names) else f"Asset {i + 1}"
+        lines.append(f"  {i + 1}. {name:<22} {w * 100:.4f}%")
+
+    return "\n".join(lines)
+
+def apply_axis_formatting(ax, count):
+    # Applies standard currency formatting and labels to a portfolio scatter plot axis
+    currency_formatter = FuncFormatter(lambda x, pos: f"${x:,.0f}")
+    ax.xaxis.set_major_formatter(currency_formatter)
+    ax.yaxis.set_major_formatter(currency_formatter)
+    ax.set_xlabel("Risk (P10)")
+    ax.set_ylabel("Average Return ($)")
+    ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
+    ax.grid(ls="--")
+
+# ==============================================================
+# TESTS BELOW
+# ==============================================================
+
+def test_winds_plot():
+    # create test case to test the parser functionality
+    test_parser = SIPParser("data/mock_sipmath_v2.xlsx")
+
+    test_winds_parser = SIPParser("data/Winds_of_Fortune_Template.xlsx")
+
+    test_winds_sip_parser = SIPParser("data/Winds_of_Fortune_SIP.xlsx")
+
+    # test winds application
+    adjusted_sips = test_parser.apply_winds(
+        simulated_groups=test_parser.investments,
+        template_groups=test_winds_parser.investments,
+        wind_groups=test_winds_sip_parser.investments)
+
+    # group_data = adjusted_sips
+    count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
+    visualize_portfolios(adjusted_sips, count=count, plot=True)
 
 def test_seeded_randomness():
     SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
