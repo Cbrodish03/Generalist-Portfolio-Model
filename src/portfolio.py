@@ -1,13 +1,11 @@
 import numpy as np
 import cvxpy as cp
 import variance_calcs as vc
-from parser import SIPParser
 
 class Portfolio:
    def __init__(self):
       self.port = {}
-   
-   # TODO: add function to turn SIPs on/off BEFORE portfolio building/calcs
+
    # Will probably need to edit input from parser separately
    def construct_port(self, source, type='c', mu_p=None, rng=None):
       """
@@ -124,7 +122,7 @@ class Portfolio:
    def eff_weights(self, group_data, mu_p):
       """
       Calculates Markowitz efficient asset weights
-      :param source: SIP trial data
+      :param group_data: SIP trial data
       :param mu_p: desired average return value for portfolio
       :return weights: array of size count efficient asset weights (minimizes variance for given average return)
       """
@@ -160,35 +158,3 @@ class Portfolio:
       """if np.any(weights < -1e-6):
          print("Warning: Infeasible solution or solver tolerance too loose.")"""
       return weights
-
-if __name__ == "__main__":
-   SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-   # SLURP = SIPParser("data/small_SIP.xlsx")
-   group_data = SLURP.investments
-
-   # Test for custom case:
-   """ gen = Portfolio()
-   cust = gen.construct_port(group_data)
-   print(cust['metadata']['AverageReturn'], cust['metadata']['Variance'], cust['weights'], sep=', ') """
-   
-   # Test for random case:
-   """ sample_portfolios = []
-   for i in range(10):
-      gen = Portfolio()
-      rand = gen.construct_port(group_data, 'r')
-      sample_portfolios.append(rand)
-
-   for port in sample_portfolios:
-      print(port['metadata']['AverageReturn'], port['metadata']['Variance'], port['weights'], sep=', ') """
-
-   # Test for efficient case:
-   gen = Portfolio()
-   mu_p = int(input("Desired average return: "))
-   while mu_p != 0:
-      eff = gen.construct_port(group_data, 'e')
-      print(eff['metadata']['AverageReturn'], np.sqrt(eff['metadata']['Variance']), eff['weights'], sep=', ')
-   
-
-
-
-   

@@ -1,5 +1,4 @@
 import numpy as np
-from parser import SIPParser
 from portfolio import Portfolio
 
 """
@@ -65,21 +64,4 @@ class RandomPortfolios:
 
       for i in range(size):
          self.sample_ports[i]['metadata']['IsParetoEff'] = is_efficient_mask[i]
-      
-if __name__ == "__main__":
-   SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-   # SLURP = SIPParser("data/small_SIP.xlsx")
-   group_data = SLURP.investments
-
-   gen = RandomPortfolios()
-   sample_portfolios = gen.generate_sample(group_data, count=100)
-
-   for port in sample_portfolios:
-      print(port['metadata']['AverageReturn'], port['metadata']['Variance'], port['weights'], sep=', ')
-
-
-
-
-
-
 

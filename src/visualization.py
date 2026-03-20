@@ -1,13 +1,10 @@
 import csv
-import hashlib
-import json
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import FuncFormatter
 
 import variance_calcs as vc
-from parser import SIPParser
 from portfolio import Portfolio
 from sample_portfolios import RandomPortfolios
 
@@ -303,62 +300,54 @@ def format_currency(value):
 
 def export_portfolios_to_csv(filepath, random_ports, eff_ports):
     """
-    Exports random and efficient portfolios to CSV file
+    Exports random and efficient portfolios to a CSV file.
     Rows formatted as:
-        Portfolio Type, Average Return, Variance, Standard Dev, Weight 1, Weight 2, ..., Weight N
-    :param filepath:
-    :param random_ports:
-    :param eff_ports:
-    :return:
+        Portfolio Type, Index, Average Return, P10 (Risk), Weight 1, Weight 2, ..., Weight N
+
+    :param filepath:     Full path to the output CSV file
+    :param random_ports: List of random portfolio dicts
+    :param eff_ports:    List of efficient portfolio dicts
+    :return:             True on success, False on failure
     """
     try:
         with open(filepath, 'w', newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            # Write header
+
             max_weights = 0
             if random_ports:
                 max_weights = max(max_weights, len(random_ports[0]['weights']))
             if eff_ports:
                 max_weights = max(max_weights, len(eff_ports[0]['weights']))
 
-            weight_headers = [f"Weight {i+1}" for i in range(max_weights)]
+            weight_headers = [f"Weight {i + 1}" for i in range(max_weights)]
 
             writer.writerow([
                 "Portfolio Type",
                 "Index",
                 "Average Return",
-                "Variance",
-                "Standard Deviation",
+                "P10 (Risk)",
                 *weight_headers
             ])
 
-            # Write random portfolios
             for i, port in enumerate(random_ports):
                 meta = port['metadata']
-                weights = port['weights']
-                row = [
+                writer.writerow([
                     "Random",
                     i + 1,
                     meta['AverageReturn'],
-                    meta['Variance'],
-                    np.sqrt(meta['Variance']),
-                    *weights
-                ]
-                writer.writerow(row)
+                    meta['PercentileOM'],
+                    *port['weights']
+                ])
 
-            # Write efficient portfolios
             for i, port in enumerate(eff_ports):
                 meta = port['metadata']
-                weights = port['weights']
-                row = [
+                writer.writerow([
                     "Efficient",
                     i + 1,
                     meta['AverageReturn'],
-                    meta['Variance'],
-                    np.sqrt(meta['Variance']),
-                    *weights
-                ]
-                writer.writerow(row)
+                    meta['PercentileOM'],
+                    *port['weights']
+                ])
 
         return True
 
@@ -410,118 +399,3 @@ def apply_axis_formatting(ax, count):
     ax.set_title(f"Random portfolios ({count} samples) & Efficient Frontier")
     ax.grid(ls="--")
 
-# ==============================================================
-# TESTS BELOW
-# ==============================================================
-
-def test_winds_plot():
-    # create test case to test the parser functionality
-    test_parser = SIPParser("data/mock_sipmath_v2.xlsx")
-
-    test_winds_parser = SIPParser("data/Winds_of_Fortune_Template.xlsx")
-
-    test_winds_sip_parser = SIPParser("data/Winds_of_Fortune_SIP.xlsx")
-
-    # test winds application
-    adjusted_sips = test_parser.apply_winds(
-        simulated_groups=test_parser.investments,
-        template_groups=test_winds_parser.investments,
-        wind_groups=test_winds_sip_parser.investments)
-
-    # group_data = adjusted_sips
-    count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
-    visualize_portfolios(adjusted_sips, count=count, plot=True)
-
-def test_seeded_randomness():
-    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    data = SLURP.investments
-
-    SEED = 5        # seed for RNG
-    COUNT = 20      # number of random portfolios to generate
-
-    def fingerprint(portfolios):
-        """Create a footprint of portfolio weights"""
-        payload = [
-            [round(w, 10) for w in p['weights']]
-            for p in portfolios
-        ]
-        blob = json.dumps(payload, sort_keys=True).encode()
-        return hashlib.sha256(blob).hexdigest()
-
-    gen1 = RandomPortfolios(seed=SEED)
-    ports1 = gen1.generate_sample(data, count=COUNT)
-
-    gen2 = RandomPortfolios(seed=SEED)
-    ports2 = gen2.generate_sample(data, count=COUNT)
-
-    fp1 = fingerprint(ports1)
-    fp2 = fingerprint(ports2)
-
-    print("Fingerprint 1:", fp1)
-    print("Fingerprint 2:", fp2)
-    print("Match:", fp1 == fp2)
-
-    # visual sanity check
-    visualize_portfolios(data, count=COUNT, plot=True, seed=SEED, show_frontier=False)
-
-# Test 1: Same seed produces identical results
-def test_determinism():
-    from parser import SIPParser
-
-    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    data = SLURP.investments
-
-    SEED = 42
-    COUNT = 100
-
-    # Run 1
-    gen1 = RandomPortfolios(seed=SEED)
-    ports1 = gen1.generate_sample(data, count=COUNT)
-
-    # Run 2
-    gen2 = RandomPortfolios(seed=SEED)
-    ports2 = gen2.generate_sample(data, count=COUNT)
-
-    # Verify identical weights
-    for i in range(COUNT):
-        assert np.allclose(ports1[i]['weights'], ports2[i]['weights'], rtol=1e-12)
-        assert np.allclose(ports1[i]['trials'], ports2[i]['trials'], rtol=1e-12)
-
-    print("✓ Determinism verified: Identical inputs produce identical outputs")
-
-# Test 2: Different seeds produce different results
-def test_seed_variation():
-    SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    data = SLURP.investments
-
-    gen1 = RandomPortfolios(seed=1)
-    ports1 = gen1.generate_sample(data, count=50)
-
-    gen2 = RandomPortfolios(seed=2)
-    ports2 = gen2.generate_sample(data, count=50)
-
-    # Verify different weights
-    different = False
-    for i in range(50):
-        if not np.allclose(ports1[i]['weights'], ports2[i]['weights']):
-            different = True
-            break
-
-    assert different, "Different seeds should produce different results"
-    print("✓ Seed variation verified: Different seeds produce different outputs")
-
-
-if __name__ == "__main__":
-    # SLURP = SIPParser("data/mock_sipmath_v2.xlsx")
-    # SLURP = SIPParser("data/small_SIP.xlsx")
-    # group_data = SLURP.investments
-    # count = int(input("How many Dirichlet-random portfolios would you like to generate? "))
-    # seed = int(input("Enter an integer seed for RNG (or 0 for random): "))
-    # if seed == 0:
-    #     seed = None
-    # visualize_portfolios(group_data, count=count, plot=True, seed=seed)
-    # pareto_plot(group_data, count=count)
-    # test_winds_plot()
-    # test_seeded_randomness()
-    test_determinism()
-    test_seed_variation()
